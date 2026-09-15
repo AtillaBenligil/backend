@@ -1,0 +1,17 @@
+# Ausgangsgruppen. Weitere Gruppen werden zur Laufzeit ueber die
+# Gruppenverwaltung des Backends angelegt.
+
+dn: cn=irpsim-admins,ou=groups,dc=irpsim,dc=uni-leipzig,dc=de
+objectClass: groupOfNames
+cn: irpsim-admins
+member: uid=alice,ou=people,dc=irpsim,dc=uni-leipzig,dc=de
+
+dn: cn=irpsim-modellers,ou=groups,dc=irpsim,dc=uni-leipzig,dc=de
+objectClass: groupOfNames
+cn: irpsim-modellers
+member: uid=bob,ou=people,dc=irpsim,dc=uni-leipzig,dc=de
+
+dn: cn=irpsim-viewers,ou=groups,dc=irpsim,dc=uni-leipzig,dc=de
+objectClass: groupOfNames
+cn: irpsim-viewers
+member: uid=carol,ou=people,dc=irpsim,dc=uni-leipzig,dc=de
