@@ -33,6 +33,9 @@ import de.unileipzig.irpsim.core.utils.PersistenceFolderUtil;
 import de.unileipzig.irpsim.server.endpoints.Cleaner;
 import de.unileipzig.irpsim.server.endpoints.ScenarioVersionUpdater;
 import de.unileipzig.irpsim.server.optimisation.queue.OptimisationJobHandler;
+import de.unileipzig.irpsim.server.security.AuthenticationFilter;
+import de.unileipzig.irpsim.server.security.JobAuthorizationFilter;
+import de.unileipzig.irpsim.server.security.SecurityComponents;
 import io.swagger.jaxrs.config.BeanConfig;
 import io.swagger.jaxrs.listing.ApiListingResource;
 import io.swagger.jaxrs.listing.SwaggerSerializers;
@@ -75,6 +78,12 @@ public final class ServerStarter {
 		rc.register(JsonParseExceptionExceptionHandler.class);
 		rc.register(ApiListingResource.class);
 		rc.register(SwaggerSerializers.class);
+
+		// Die Sicherheitskomponenten werden vor dem Registrieren des Filters
+		// aufgebaut, damit die Verzeichnisanbindung beim ersten Zugriff steht.
+		SecurityComponents.initialise();
+		rc.register(AuthenticationFilter.class);
+		rc.register(JobAuthorizationFilter.class);
 
 		LOG.info("Starte Server unter URI: {}", uri);
 

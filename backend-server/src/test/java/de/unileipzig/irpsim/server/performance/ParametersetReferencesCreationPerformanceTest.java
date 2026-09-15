@@ -39,7 +39,9 @@ public final class ParametersetReferencesCreationPerformanceTest extends ServerT
 	@Test
 //	@PerformanceTest(executionTimes = 4, warmupExecutions = 2, timeout = 30000)
 	public void testDirectPuttingParameterSet() {
-		final Response response = new ScenarioEndpoint().createNewSimulationParameters(PARAMETERSET);
+		// Ohne Sicherheitskontext wird kein Eigentuemer eingetragen; der Test prueft
+		// weiterhin ausschliesslich das Anlegen des Parametersatzes.
+		final Response response = new ScenarioEndpoint().createNewSimulationParameters(PARAMETERSET, null);
 		Assert.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
 	}
 }

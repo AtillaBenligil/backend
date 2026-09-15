@@ -14,7 +14,10 @@ import de.unileipzig.irpsim.core.simulation.data.persistence.ClosableEntityManag
 import de.unileipzig.irpsim.core.simulation.data.persistence.ClosableEntityManagerProxy;
 import de.unileipzig.irpsim.core.standingdata.SzenarioSet;
 import de.unileipzig.irpsim.server.data.Responses;
+import de.unileipzig.irpsim.core.security.Permission;
+import de.unileipzig.irpsim.core.security.ResourceType;
 import de.unileipzig.irpsim.server.data.modeldefinitions.ModelDefinitionsEndpoint;
+import de.unileipzig.irpsim.server.security.ResourceAccess;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
@@ -30,13 +33,17 @@ import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 import javax.ws.rs.*;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
 import java.io.IOException;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static de.unileipzig.irpsim.server.data.Responses.badRequestResponse;
 import static de.unileipzig.irpsim.server.data.Responses.errorResponse;
@@ -62,10 +69,11 @@ public class ScenarioEndpoint {
    @Produces(MediaType.APPLICATION_JSON)
    @ApiOperation(value = "Liefert Szenarien zurück", notes = "Liest alle Szenarien aus und gibt sie inklusive ihrer Metadaten zurück.")
    @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok") })
-   public final Response getSimulationParameters(@QueryParam("modeldefinition") int modeldefinition) {
+   public final Response getSimulationParameters(@QueryParam("modeldefinition") int modeldefinition,
+         @Context final SecurityContext securityContext) {
       try (ClosableEntityManager em = ClosableEntityManagerProxy.newInstance()) {
          final Session s = em.unwrap(Session.class);
-         final Map<Integer, OptimisationScenario> dataMap = getScenarioMap(modeldefinition, s);
+         final Map<Integer, OptimisationScenario> dataMap = getScenarioMap(modeldefinition, s, securityContext);
 
          String metadataString = "";
          try {
@@ -91,7 +99,8 @@ public class ScenarioEndpoint {
       }
    }
 
-   private Map<Integer, OptimisationScenario> getScenarioMap(int modeldefinition, final Session s) {
+   private Map<Integer, OptimisationScenario> getScenarioMap(int modeldefinition, final Session s,
+         final SecurityContext securityContext) {
       CriteriaBuilder builder = s.getCriteriaBuilder();
       CriteriaQuery<Tuple> query = builder.createQuery(Tuple.class);
       Root<OptimisationScenario> queryRoot = query.from(OptimisationScenario.class);
@@ -110,8 +119,15 @@ public class ScenarioEndpoint {
             queryRoot.get("date").alias("date"),
             queryRoot.get("version").alias("version"));
 
-      if (modeldefinition != 0)
-         query.where(likeRestrictions);
+      // Die Sichtbarkeit wird als zusaetzliche Bedingung in die Abfrage aufgenommen,
+      // damit die Einschraenkung bereits in der Datenbank erfolgt und nicht erst
+      // nach dem Laden aller Szenarien.
+      final Predicate visibility = buildVisibilityPredicate(builder, queryRoot, securityContext);
+      if (modeldefinition != 0) {
+         query.where(builder.and(likeRestrictions, visibility));
+      } else {
+         query.where(visibility);
+      }
 
       final List<Tuple> metaDataList = s.createQuery(query).getResultList();
       final Map<Integer, OptimisationScenario> dataMap = new LinkedHashMap<>();
@@ -132,6 +148,37 @@ public class ScenarioEndpoint {
    }
 
    /**
+    * Bildet die Bedingung, die die Auflistung auf die fuer den Benutzer
+    * sichtbaren Szenarien einschraenkt.
+    *
+    * Szenarien, fuer die keine Rechte vergeben wurden, stammen aus der Zeit vor
+    * der Rechteverwaltung und bleiben sichtbar. Alle uebrigen Szenarien werden
+    * nur dann aufgefuehrt, wenn dem Benutzer oder einer seiner Gruppen ein
+    * Recht an ihnen eingeraeumt wurde.
+    *
+    * @param builder Der Ersteller der Abfragebedingungen
+    * @param root Die Wurzel der Szenarioabfrage
+    * @param securityContext Der Sicherheitskontext der Anfrage
+    * @return Die Bedingung fuer die sichtbaren Szenarien
+    */
+   private static Predicate buildVisibilityPredicate(final CriteriaBuilder builder, final Root<OptimisationScenario> root,
+         final SecurityContext securityContext) {
+      final Set<Long> restricted = ResourceAccess.restricted(ResourceType.SCENARIO);
+      if (restricted.isEmpty()) {
+         return builder.conjunction();
+      }
+      final List<Integer> restrictedIds = restricted.stream().map(Long::intValue).collect(Collectors.toList());
+      final Predicate withoutRights = builder.not(root.get("id").in(restrictedIds));
+
+      final Set<Long> permitted = ResourceAccess.permitted(securityContext, ResourceType.SCENARIO);
+      if (permitted.isEmpty()) {
+         return withoutRights;
+      }
+      final List<Integer> permittedIds = permitted.stream().map(Long::intValue).collect(Collectors.toList());
+      return builder.or(withoutRights, root.get("id").in(permittedIds));
+   }
+
+   /**
     * Gibt den Simulationsparametersatz mit der übergebenen Id zurück.
     *
     * @param id Die ID des Simulationsparametersatz
@@ -145,8 +192,13 @@ public class ScenarioEndpoint {
    @Path("/{id}")
    @ApiOperation(value = "Gibt den Simulationsparametersatz mit der übergebenen Id zurück.", notes = "")
    @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok"), @ApiResponse(code = 204, message = "No Content") })
-   public final Response getConcreteSimulationParameters(@PathParam("id") final int id) throws JsonParseException, JsonMappingException, IOException {
+   public final Response getConcreteSimulationParameters(@PathParam("id") final int id,
+         @Context final SecurityContext securityContext) throws JsonParseException, JsonMappingException, IOException {
       LOG.info("Lade Parameter für: {}", id);
+      if (!ResourceAccess.isPermitted(securityContext, ResourceType.SCENARIO, id, Permission.READ)) {
+         LOG.info("Lesezugriff auf Szenario {} durch {} abgelehnt", id, ResourceAccess.username(securityContext));
+         return ResourceAccess.forbidden();
+      }
       try (ClosableEntityManager em = ClosableEntityManagerProxy.newInstance()) {
          LOG.trace("Laden beginnt..");
          final OptimisationScenario spm = em.find(OptimisationScenario.class, id);
@@ -180,8 +232,13 @@ public class ScenarioEndpoint {
    @Path("/{id}")
    @ApiOperation(value = "Löscht Parameter nach einer bestimmen Id", notes = "Prüft, ob der Parametersatz mit der übergebenen Id löschbar ist, und löscht ihn, falls er löschbar ist.")
    @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok"), @ApiResponse(code = 400, message = "Bad Request") })
-   public final Response deleteParameter(@PathParam("id") final int id) throws JsonParseException, JsonMappingException, IOException {
+   public final Response deleteParameter(@PathParam("id") final int id, @Context final SecurityContext securityContext)
+         throws JsonParseException, JsonMappingException, IOException {
       LOG.info("Lade Parameter für: {}", id);
+      if (!ResourceAccess.isPermitted(securityContext, ResourceType.SCENARIO, id, Permission.WRITE)) {
+         LOG.info("Löschen von Szenario {} durch {} abgelehnt", id, ResourceAccess.username(securityContext));
+         return ResourceAccess.forbidden();
+      }
       try (ClosableEntityManager em = ClosableEntityManagerProxy.newInstance()) {
          final Session s = (Session) em.getDelegate();
          final OptimisationScenario spm = s.get(OptimisationScenario.class, id);
@@ -192,6 +249,9 @@ public class ScenarioEndpoint {
                em.getTransaction().begin();
                s.delete(spm);
                em.getTransaction().commit();
+               // Die Rechte des geloeschten Szenarios werden mit entfernt,
+               // damit keine verwaisten Eintraege zurueckbleiben.
+               ResourceAccess.getService().revokeAll(ResourceType.SCENARIO, id);
                return Response.ok().build();
             } else {
                LOG.debug("Unlöschbar");
@@ -218,7 +278,8 @@ public class ScenarioEndpoint {
    @ApiOperation(value = "Fügt neuen Simulationsparameter hinzu", notes = "Fügt den übergebenen Parametersatz in die Datenbank ein. "
          + "Dabei werden Metadaten, wie Erstellungsdatum und Modelltyp, automatisch generiert.")
    @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok"), @ApiResponse(code = 400, message = "Bad Request") })
-   public final Response createNewSimulationParameters(final String simulationParameters) {
+   public final Response createNewSimulationParameters(final String simulationParameters,
+         @Context final SecurityContext securityContext) {
       try {
          final String dataString = getDataString(simulationParameters);
          final OptimisationScenario simulationMetadata = MAPPER.readValue(simulationParameters, OptimisationScenario.class);
@@ -229,10 +290,14 @@ public class ScenarioEndpoint {
          try (ClosableEntityManager em = ClosableEntityManagerProxy.newInstance()) {
             response = importMultiModelScenario(dataString, em, simulationMetadata);
          }
-         if (response != null)
+         if (response != null) {
+            // Ohne diesen Eintrag waere das neue Szenario fuer alle lesbar,
+            // aber fuer niemanden bearbeitbar.
+            ResourceAccess.grantOwnership(securityContext, ResourceType.SCENARIO, simulationMetadata.getId());
             return response;
-         else
+         } else {
             return badRequestResponse("Unbekannter ParameterJson Fehler ist aufgetreten.");
+         }
       } catch (final Throwable e) {
          e.printStackTrace();
          return errorResponse(e, "Fehler beim Import");
@@ -251,7 +316,12 @@ public class ScenarioEndpoint {
    @ApiOperation(value = "Fügt neuen Simulationsparameter hinzu", notes = "Fügt den übergebenen Parametersatz in die Datenbank ein. "
          + "Dabei werden Metadaten, wie Erstellungsdatum und Modelltyp, automatisch generiert.")
    @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok"), @ApiResponse(code = 400, message = "Bad Request") })
-   public final Response createNewSimulationParameters(@PathParam("id") final int id, final String simulationParameters) {
+   public final Response createNewSimulationParameters(@PathParam("id") final int id, final String simulationParameters,
+         @Context final SecurityContext securityContext) {
+      if (!ResourceAccess.isPermitted(securityContext, ResourceType.SCENARIO, id, Permission.WRITE)) {
+         LOG.info("Änderung an Szenario {} durch {} abgelehnt", id, ResourceAccess.username(securityContext));
+         return ResourceAccess.forbidden();
+      }
       try {
          try (ClosableEntityManager em = ClosableEntityManagerProxy.newInstance()) {
             final OptimisationScenario simulationMetadata = em.find(OptimisationScenario.class, id);
