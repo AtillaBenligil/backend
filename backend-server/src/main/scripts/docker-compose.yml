@@ -1,0 +1,45 @@
+# Startet die vollstaendige Entwicklungsumgebung fuer IRPsim:
+# MariaDB (Persistenz) und OpenLDAP (Authentifizierung).
+#
+#   docker compose up -d
+#
+# Die LDAP-Testbenutzer werden beim ersten Start aus ldap/*.ldif geladen.
+version: "3.8"
+
+services:
+  mariadb:
+    image: mariadb:10.4
+    container_name: irpsim-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: 1rps1m
+      MYSQL_DATABASE: irpsim
+      MYSQL_INITDB_SKIP_TZINFO: 1
+    ports:
+      - "5030:3306"
+    volumes:
+      - ../import:/var/lib/import/
+    networks:
+      - irpsim
+
+  ldap:
+    image: osixia/openldap:1.5.0
+    container_name: irpsim-ldap
+    environment:
+      LDAP_ORGANISATION: "IRPsim"
+      LDAP_DOMAIN: "irpsim.uni-leipzig.de"
+      LDAP_ADMIN_PASSWORD: "1rps1m"
+      LDAP_CONFIG_PASSWORD: "1rps1m"
+      LDAP_RFC2307BIS_SCHEMA: "true"
+      LDAP_REMOVE_CONFIG_AFTER_SETUP: "false"
+    command: ["--copy-service"]
+    ports:
+      - "10389:389"
+      - "10636:636"
+    volumes:
+      - ./ldap:/container/service/slapd/assets/config/bootstrap/ldif/custom
+    networks:
+      - irpsim
+
+networks:
+  irpsim:
+    name: irpsimtest

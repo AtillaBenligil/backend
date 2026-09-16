@@ -1,0 +1,28 @@
+# Testbenutzer fuer die Entwicklungsumgebung.
+# Die Passwoerter liegen bewusst im Klartext vor, damit die Umgebung ohne
+# zusaetzliche Werkzeuge reproduzierbar startet. Fuer den produktiven Betrieb
+# werden die Eintraege aus dem Verzeichnis der Universitaet uebernommen.
+
+dn: uid=alice,ou=people,dc=irpsim,dc=uni-leipzig,dc=de
+objectClass: inetOrgPerson
+uid: alice
+cn: Alice Admin
+sn: Admin
+mail: alice@irpsim.uni-leipzig.de
+userPassword: alice123
+
+dn: uid=bob,ou=people,dc=irpsim,dc=uni-leipzig,dc=de
+objectClass: inetOrgPerson
+uid: bob
+cn: Bob Modeller
+sn: Modeller
+mail: bob@irpsim.uni-leipzig.de
+userPassword: bob123
+
+dn: uid=carol,ou=people,dc=irpsim,dc=uni-leipzig,dc=de
+objectClass: inetOrgPerson
+uid: carol
+cn: Carol Viewer
+sn: Viewer
+mail: carol@irpsim.uni-leipzig.de
+userPassword: carol123

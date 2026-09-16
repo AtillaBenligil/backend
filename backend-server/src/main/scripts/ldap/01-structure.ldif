@@ -1,0 +1,10 @@
+# Basisstruktur des IRPsim-Verzeichnisses.
+# Wird beim ersten Start des LDAP-Containers automatisch eingespielt.
+
+dn: ou=people,dc=irpsim,dc=uni-leipzig,dc=de
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=irpsim,dc=uni-leipzig,dc=de
+objectClass: organizationalUnit
+ou: groups

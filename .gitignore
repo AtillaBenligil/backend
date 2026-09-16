@@ -53,3 +53,13 @@ backend-gams/src/test/scripts/url.txt
 backend-gams/src/test/scripts/db.txt
 
 gams24.7_linux_x64_64_sfx/
+
+# Der Maven-Wrapper gehoert zum Build und muss trotz der Regel fuer JAR-Dateien
+# eingecheckt werden, damit das Projekt ohne vorinstalliertes Maven baut.
+!.mvn/wrapper/maven-wrapper.jar
+
+# Laufzeitdateien des LDAP-Testservers, analog zu db.txt und url.txt
+backend-server/src/test/scripts/ldap.txt
+backend-server/src/test/scripts/ldapurl.txt
+backend-server/ldap.txt
+backend-server/ldapurl.txt
