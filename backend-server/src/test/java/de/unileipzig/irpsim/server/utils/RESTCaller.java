@@ -31,7 +31,7 @@ public final class RESTCaller {
 	public static String callGet(final String uri) throws AssertionError {
 		LOG.trace("callGet: {}", uri);
 		final JerseyWebTarget jwt = jc.target(uri);
-		final Builder response = jwt.request();
+		final Builder response = authenticated(jwt);
 		final Response r = response.get();
 		if (r.getStatus() != 200) {
 			LOG.warn("Die Rückgabe liefert einen Fehler! Status {}: {}", r.getStatus(), r.getStatusInfo());
@@ -50,7 +50,7 @@ public final class RESTCaller {
 	 */
 	public static Response callGetResponse(final String uri) {
 		final JerseyWebTarget jwt = jc.target(uri);
-		final Builder response = jwt.request();
+		final Builder response = authenticated(jwt);
 		final Response r = response.get();
 		return r;
 	}
@@ -64,7 +64,7 @@ public final class RESTCaller {
 	 */
 	public static Response callPutResponse(final String uri, final String load) {
 		final JerseyWebTarget jwt = jc.target(uri);
-		final Builder response = jwt.request();
+		final Builder response = authenticated(jwt);
 		final Response r = response.put(Entity.entity(load, MediaType.APPLICATION_JSON));
 		return r;
 	}
@@ -77,7 +77,7 @@ public final class RESTCaller {
 	 */
 	public static Response callDeleteResponse(final String uri) {
 		final JerseyWebTarget jwt = jc.target(uri);
-		final Builder response = jwt.request();
+		final Builder response = authenticated(jwt);
 		final Response r = response.delete();
 		return r;
 	}
@@ -91,16 +91,46 @@ public final class RESTCaller {
 	 */
 	public static Response callDeleteResponse(final String uri, final boolean delete) {
 		final JerseyWebTarget jwt = jc.target(uri + "?delete=" + delete);
-		final Builder response = jwt.request();
+		final Builder response = authenticated(jwt);
 		final Response r = response.delete();
 		return r;
 	}
 
 	public static Response callPost(final String uri, final String load) {
 		final JerseyWebTarget jwt = jc.target(uri);
-		final Builder response = jwt.request();
+		final Builder response = authenticated(jwt);
 		final Response r = response.post(Entity.entity(load, MediaType.APPLICATION_JSON));
 		return r;
 	}
 
+	/** Das Zugriffstoken, das den Testanfragen mitgegeben wird. */
+	private static String token;
+
+	/**
+	 * Hinterlegt das Zugriffstoken fuer alle folgenden Testanfragen.
+	 *
+	 * Die Endpunkte des Backends sind seit der Einfuehrung der Anmeldung
+	 * geschuetzt. Damit die bestehenden Integrationstests weiterhin gegen den
+	 * Testserver arbeiten koennen, erzeugt {@link ServerTestUtils} beim
+	 * Serverstart eine Sitzung und hinterlegt deren Token hier.
+	 *
+	 * @param newToken Das Zugriffstoken oder null, um ohne Anmeldung zu senden
+	 */
+	public static void setToken(final String newToken) {
+		token = newToken;
+	}
+
+	/**
+	 * Erzeugt einen Anfrage-Builder und ergaenzt ihn um den Authorization-Header.
+	 *
+	 * @param jwt Das Ziel der Anfrage
+	 * @return Der vorbereitete Anfrage-Builder
+	 */
+	private static Builder authenticated(final JerseyWebTarget jwt) {
+		final Builder builder = jwt.request();
+		if (token != null) {
+			builder.header("Authorization", "Bearer " + token);
+		}
+		return builder;
+	}
 }

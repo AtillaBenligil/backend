@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
@@ -40,6 +41,8 @@ import de.unileipzig.irpsim.core.standingdata.DataLoader;
 import de.unileipzig.irpsim.server.ServerStarter;
 import de.unileipzig.irpsim.server.optimisation.Job;
 import de.unileipzig.irpsim.server.optimisation.queue.OptimisationJobHandler;
+import de.unileipzig.irpsim.server.security.AuthenticatedUser;
+import de.unileipzig.irpsim.server.security.SecurityComponents;
 
 /**
  * Verwaltet das Starten- und Beenden des Testservers.
@@ -114,12 +117,29 @@ public final class ServerTestUtils {
 
       try {
          server = ServerStarter.startServer(baseURI);
+         openTestSession();
       } catch (ProcessingException processingException) {
          LOG.debug("Port {} ist bereits in Benutzung! Versuche Serverstart mit erhöhter Portnummer.", port);
          processingException.printStackTrace();
          startServer();
       }
 
+   }
+
+
+   /**
+    * Legt eine Sitzung fuer die Integrationstests an.
+    *
+    * Der Testserver laeuft im selben Prozess, daher kann die Sitzung unmittelbar
+    * ueber die Sitzungsverwaltung erzeugt werden. Das vermeidet, dass fuer jeden
+    * bestehenden Integrationstest ein Verzeichnisserver bereitstehen muss; die
+    * Anmeldung gegen das Verzeichnis wird in den Tests der Sicherheitsschicht
+    * geprueft.
+    */
+   private static void openTestSession() {
+      final AuthenticatedUser user = new AuthenticatedUser("testbenutzer",
+            new HashSet<>(Arrays.asList("irpsim-admins")));
+      RESTCaller.setToken(SecurityComponents.getSessionManager().create(user).getToken());
    }
 
 	/**
