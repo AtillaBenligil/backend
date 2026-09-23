@@ -12,5 +12,11 @@ public enum ResourceType {
    SCENARIO,
 
    /** Ein Simulationsauftrag der Optimierung. */
-   JOB
+   JOB,
+
+   /**
+    * Ein Stammdatum der Datenverwaltung. Ersetzt die bisherige Zuordnung von
+    * verantwortlichen Personen.
+    */
+   STAMMDATUM
 }

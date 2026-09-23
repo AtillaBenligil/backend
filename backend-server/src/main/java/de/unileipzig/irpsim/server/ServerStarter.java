@@ -34,7 +34,7 @@ import de.unileipzig.irpsim.server.endpoints.Cleaner;
 import de.unileipzig.irpsim.server.endpoints.ScenarioVersionUpdater;
 import de.unileipzig.irpsim.server.optimisation.queue.OptimisationJobHandler;
 import de.unileipzig.irpsim.server.security.AuthenticationFilter;
-import de.unileipzig.irpsim.server.security.JobAuthorizationFilter;
+import de.unileipzig.irpsim.server.security.ResourceAuthorizationFilter;
 import de.unileipzig.irpsim.server.security.SecurityComponents;
 import io.swagger.jaxrs.config.BeanConfig;
 import io.swagger.jaxrs.listing.ApiListingResource;
@@ -83,7 +83,7 @@ public final class ServerStarter {
 		// aufgebaut, damit die Verzeichnisanbindung beim ersten Zugriff steht.
 		SecurityComponents.initialise();
 		rc.register(AuthenticationFilter.class);
-		rc.register(JobAuthorizationFilter.class);
+		rc.register(ResourceAuthorizationFilter.class);
 
 		LOG.info("Starte Server unter URI: {}", uri);
 

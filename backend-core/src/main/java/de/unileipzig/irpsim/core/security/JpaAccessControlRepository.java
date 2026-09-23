@@ -81,6 +81,22 @@ public class JpaAccessControlRepository implements AccessControlRepository {
    }
 
    @Override
+   public boolean deleteEntry(final ResourceType resourceType, final long resourceId, final SubjectType subjectType, final String subjectName) {
+      try (ClosableEntityManager em = ClosableEntityManagerProxy.newInstance()) {
+         em.getTransaction().begin();
+         final int removed = em.createQuery("DELETE FROM AccessControlEntry e WHERE e.resourceType = :type AND e.resourceId = :id "
+               + "AND e.subjectType = :subjectType AND e.subjectName = :subjectName")
+               .setParameter("type", resourceType)
+               .setParameter("id", resourceId)
+               .setParameter("subjectType", subjectType)
+               .setParameter("subjectName", subjectName)
+               .executeUpdate();
+         em.getTransaction().commit();
+         return removed > 0;
+      }
+   }
+
+   @Override
    public void deleteEntries(final ResourceType resourceType, final long resourceId) {
       try (ClosableEntityManager em = ClosableEntityManagerProxy.newInstance()) {
          em.getTransaction().begin();

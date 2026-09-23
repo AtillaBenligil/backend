@@ -30,7 +30,6 @@ import com.unboundid.ldap.sdk.Entry;
 import de.unileipzig.irpsim.core.security.AccessControlEntry;
 import de.unileipzig.irpsim.core.security.AccessControlRepository;
 import de.unileipzig.irpsim.core.security.AuthorizationService;
-import de.unileipzig.irpsim.core.security.JpaAccessControlRepository;
 import de.unileipzig.irpsim.core.security.Permission;
 import de.unileipzig.irpsim.core.security.ResourceType;
 import de.unileipzig.irpsim.core.security.SubjectType;
@@ -101,7 +100,7 @@ public class AuthenticationEndpointTest {
    public void stopServers() {
       // Der Dienst wird zurueckgesetzt, damit ein Test die Rechtepruefung der
       // folgenden Tests nicht beeinflusst.
-      ResourceAccess.setService(new AuthorizationService(new JpaAccessControlRepository()));
+      ResourceAccess.setService(ResourceAccess.createDefaultService());
       if (server != null) {
          server.shutdownNow();
       }
@@ -176,7 +175,7 @@ public class AuthenticationEndpointTest {
     * erreichen.
     *
     * Geprüft wird die vollständige Kette: Der Anmeldefilter erkennt das Token
-    * an und reicht die Anfrage weiter, woraufhin der JobAuthorizationFilter den
+    * an und reicht die Anfrage weiter, woraufhin der ResourceAuthorizationFilter den
     * Zugriff mangels Berechtigung mit 403 abweist. Die Unterscheidung zwischen
     * 401 und 403 zeigt, dass die Anmeldung anerkannt und erst die
     * Rechteprüfung negativ ausgefallen ist.
@@ -236,9 +235,36 @@ public class AuthenticationEndpointTest {
       }
 
       @Override
+      public boolean deleteEntry(final ResourceType resourceType, final long resourceId, final SubjectType subjectType,
+            final String subjectName) {
+         throw new UnsupportedOperationException();
+      }
+
+      @Override
       public void deleteEntries(final ResourceType resourceType, final long resourceId) {
          throw new UnsupportedOperationException();
       }
+   }
+
+   /**
+    * Benutzer ohne Administratorrolle dürfen Gruppen weder anlegen noch
+    * löschen noch deren Mitglieder ändern; sonst könnte sich jeder selbst in
+    * eine Gruppe aufnehmen und deren Rechte erlangen.
+    *
+    * Die Anfragen werden abgewiesen, bevor die Datenbank berührt wird, daher
+    * kommt der Test ohne Datenbank aus.
+    *
+    * @throws Exception Falls die Anfrage fehlschlägt
+    */
+   @Test
+   public void testGroupManagementRequiresAdministrator() throws Exception {
+      final Response login = post("/auth/login", "{\"username\":\"bob\",\"password\":\"bob123\"}", null);
+      final String token = new JSONObject(login.body).getString("token");
+
+      assertEquals(403, send("PUT", "/groups", "{\"name\":\"eigene\"}", token).status);
+      assertEquals(403, send("DELETE", "/groups/irpsim-modellers", null, token).status);
+      assertEquals(403, post("/groups/irpsim-modellers/members/bob", "", token).status);
+      assertEquals(403, send("DELETE", "/groups/irpsim-modellers/members/carol", null, token).status);
    }
 
    /**

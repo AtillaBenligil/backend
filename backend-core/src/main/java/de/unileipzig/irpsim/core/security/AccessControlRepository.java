@@ -65,6 +65,18 @@ public interface AccessControlRepository {
    void save(AccessControlEntry entry);
 
    /**
+    * Entfernt das Zugriffsrecht eines Benutzers oder einer Gruppe an einer
+    * Ressource.
+    *
+    * @param resourceType Die Art der Ressource
+    * @param resourceId Die Kennung der Ressource
+    * @param subjectType Ob das Recht für einen Benutzer oder eine Gruppe gilt
+    * @param subjectName Der Name des Benutzers oder der Gruppe
+    * @return true, falls ein Eintrag entfernt wurde
+    */
+   boolean deleteEntry(ResourceType resourceType, long resourceId, SubjectType subjectType, String subjectName);
+
+   /**
     * Entfernt alle Zugriffsrechte an einer Ressource.
     *
     * Wird beim Löschen einer Ressource aufgerufen, damit keine verwaisten

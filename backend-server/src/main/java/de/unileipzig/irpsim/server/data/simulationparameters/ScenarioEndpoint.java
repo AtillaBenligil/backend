@@ -42,8 +42,6 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import static de.unileipzig.irpsim.server.data.Responses.badRequestResponse;
 import static de.unileipzig.irpsim.server.data.Responses.errorResponse;
@@ -163,19 +161,7 @@ public class ScenarioEndpoint {
     */
    private static Predicate buildVisibilityPredicate(final CriteriaBuilder builder, final Root<OptimisationScenario> root,
          final SecurityContext securityContext) {
-      final Set<Long> restricted = ResourceAccess.restricted(ResourceType.SCENARIO);
-      if (restricted.isEmpty()) {
-         return builder.conjunction();
-      }
-      final List<Integer> restrictedIds = restricted.stream().map(Long::intValue).collect(Collectors.toList());
-      final Predicate withoutRights = builder.not(root.get("id").in(restrictedIds));
-
-      final Set<Long> permitted = ResourceAccess.permitted(securityContext, ResourceType.SCENARIO);
-      if (permitted.isEmpty()) {
-         return withoutRights;
-      }
-      final List<Integer> permittedIds = permitted.stream().map(Long::intValue).collect(Collectors.toList());
-      return builder.or(withoutRights, root.get("id").in(permittedIds));
+      return ResourceAccess.visibilityPredicate(builder, root.get("id"), ResourceType.SCENARIO, securityContext, Long::intValue);
    }
 
    /**

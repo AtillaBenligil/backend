@@ -11,8 +11,10 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -31,6 +33,11 @@ import io.swagger.annotations.ApiResponses;
  * Gruppen aufgenommen und wieder entfernt. Die Gruppen bilden die Grundlage
  * dafür, Szenarien und Simulationsaufträge nicht nur einzelnen Benutzern,
  * sondern ganzen Arbeitsgruppen zugänglich zu machen.
+ *
+ * Die Auflistung steht allen angemeldeten Benutzern offen, damit sie Ressourcen
+ * für eine Gruppe freigeben können. Anlegen, Löschen und das Ändern der
+ * Mitglieder ist den Administratoren vorbehalten; sonst könnte sich jeder
+ * Benutzer selbst in eine Gruppe aufnehmen und damit deren Rechte erlangen.
  *
  * @author benligil
  */
@@ -66,8 +73,12 @@ public class GroupEndpoint {
    @Consumes(MediaType.APPLICATION_JSON)
    @Produces(MediaType.APPLICATION_JSON)
    @ApiOperation(value = "Legt eine Benutzergruppe an.", notes = "Erzeugt eine neue Gruppe; der Name muss eindeutig sein.")
-   @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok"), @ApiResponse(code = 409, message = "Gruppe existiert bereits") })
-   public final Response createGroup(final UserGroup group) {
+   @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok"), @ApiResponse(code = 409, message = "Gruppe existiert bereits"),
+         @ApiResponse(code = 403, message = "Nur für Administratoren") })
+   public final Response createGroup(final UserGroup group, @Context final SecurityContext securityContext) {
+      if (!ResourceAccess.isAdministrator(securityContext)) {
+         return forbidden(securityContext, "Gruppe anlegen");
+      }
       if (group == null || group.getName() == null || group.getName().isEmpty()) {
          return Response.status(Response.Status.BAD_REQUEST).entity("{\"error\":\"Der Gruppenname darf nicht leer sein\"}").build();
       }
@@ -89,8 +100,12 @@ public class GroupEndpoint {
    @Path("/{name}")
    @Produces(MediaType.APPLICATION_JSON)
    @ApiOperation(value = "Löscht eine Benutzergruppe.", notes = "Entfernt die Gruppe samt aller Mitgliedschaften.")
-   @ApiResponses(value = { @ApiResponse(code = 204, message = "Gelöscht"), @ApiResponse(code = 404, message = "Gruppe unbekannt") })
-   public final Response deleteGroup(@PathParam("name") final String name) {
+   @ApiResponses(value = { @ApiResponse(code = 204, message = "Gelöscht"), @ApiResponse(code = 404, message = "Gruppe unbekannt"),
+         @ApiResponse(code = 403, message = "Nur für Administratoren") })
+   public final Response deleteGroup(@PathParam("name") final String name, @Context final SecurityContext securityContext) {
+      if (!ResourceAccess.isAdministrator(securityContext)) {
+         return forbidden(securityContext, "Gruppe löschen");
+      }
       if (!repository.deleteByName(name)) {
          return notFound();
       }
@@ -109,8 +124,13 @@ public class GroupEndpoint {
    @Path("/{name}/members/{username}")
    @Produces(MediaType.APPLICATION_JSON)
    @ApiOperation(value = "Nimmt einen Benutzer in eine Gruppe auf.", notes = "Fügt den Benutzer der Mitgliederliste der Gruppe hinzu.")
-   @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok"), @ApiResponse(code = 404, message = "Gruppe unbekannt") })
-   public final Response addMember(@PathParam("name") final String name, @PathParam("username") final String username) {
+   @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok"), @ApiResponse(code = 404, message = "Gruppe unbekannt"),
+         @ApiResponse(code = 403, message = "Nur für Administratoren") })
+   public final Response addMember(@PathParam("name") final String name, @PathParam("username") final String username,
+         @Context final SecurityContext securityContext) {
+      if (!ResourceAccess.isAdministrator(securityContext)) {
+         return forbidden(securityContext, "Mitglied aufnehmen");
+      }
       final Optional<UserGroup> group = repository.findByName(name);
       if (!group.isPresent()) {
          return notFound();
@@ -132,8 +152,13 @@ public class GroupEndpoint {
    @Path("/{name}/members/{username}")
    @Produces(MediaType.APPLICATION_JSON)
    @ApiOperation(value = "Entfernt einen Benutzer aus einer Gruppe.", notes = "Nimmt den Benutzer aus der Mitgliederliste der Gruppe heraus.")
-   @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok"), @ApiResponse(code = 404, message = "Gruppe unbekannt") })
-   public final Response removeMember(@PathParam("name") final String name, @PathParam("username") final String username) {
+   @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok"), @ApiResponse(code = 404, message = "Gruppe unbekannt"),
+         @ApiResponse(code = 403, message = "Nur für Administratoren") })
+   public final Response removeMember(@PathParam("name") final String name, @PathParam("username") final String username,
+         @Context final SecurityContext securityContext) {
+      if (!ResourceAccess.isAdministrator(securityContext)) {
+         return forbidden(securityContext, "Mitglied entfernen");
+      }
       final Optional<UserGroup> group = repository.findByName(name);
       if (!group.isPresent()) {
          return notFound();
@@ -142,6 +167,11 @@ public class GroupEndpoint {
       final UserGroup saved = repository.save(group.get());
       LOG.info("Benutzer {} aus Gruppe {} entfernt", username, name);
       return Response.ok(saved).build();
+   }
+
+   private static Response forbidden(final SecurityContext securityContext, final String action) {
+      LOG.info("{} durch {} abgelehnt: keine Administratorrechte", action, ResourceAccess.username(securityContext));
+      return ResourceAccess.forbidden();
    }
 
    private static Response notFound() {
