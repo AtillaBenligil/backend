@@ -99,7 +99,7 @@ public final class IRPoptServerTest extends ServerTests {
          LOG.info("Status-URI: " + testURI);
          final JerseyWebTarget jwt = getJerseyClient().target(testURI);
 
-         final Response response = jwt.request().accept(MediaType.APPLICATION_JSON).get();
+         final Response response = RESTCaller.request(jwt).accept(MediaType.APPLICATION_JSON).get();
          final String resultstring = response.readEntity(String.class);
          LOG.info("GET: " + resultstring + " " + resultstring.getClass());
 

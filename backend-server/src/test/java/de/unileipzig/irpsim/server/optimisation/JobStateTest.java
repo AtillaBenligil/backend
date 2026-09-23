@@ -25,6 +25,7 @@ import de.unileipzig.irpsim.core.simulation.data.persistence.State;
 import de.unileipzig.irpsim.core.testutils.DatabaseTestUtils;
 import de.unileipzig.irpsim.core.utils.TestFiles;
 import de.unileipzig.irpsim.server.utils.ServerTestUtils;
+import de.unileipzig.irpsim.server.utils.RESTCaller;
 import de.unileipzig.irpsim.server.utils.ServerTests;
 
 /**
@@ -48,7 +49,7 @@ public final class JobStateTest extends ServerTests {
 		final long jobid = ServerTestUtils.startSimulation(om.writeValueAsString(gpj));
 		final String testURI = ServerTestUtils.OPTIMISATION_URI + "/" + jobid + "/";
 		final JerseyWebTarget jwt = getJerseyClient().target(testURI);
-		String resultstring = jwt.request().accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
+		String resultstring = RESTCaller.request(jwt).accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
 
 		IntermediarySimulationStatus iss = om.readValue(resultstring, IntermediarySimulationStatus.class);
 		State state = iss.getState();
@@ -56,7 +57,7 @@ public final class JobStateTest extends ServerTests {
 		int previousYear = iss.getYearIndex();
 		while (state != State.FINISHED && state != State.ERROR && state != State.FINISHEDERROR) {
 
-			resultstring = jwt.request().accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
+			resultstring = RESTCaller.request(jwt).accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
 			iss = om.readValue(resultstring, IntermediarySimulationStatus.class);
 			final UserDefinedDescription description = iss.getDescription();
 			assertEqualDescription(description);
@@ -71,7 +72,7 @@ public final class JobStateTest extends ServerTests {
 			Thread.sleep(100);
 		}
 		Thread.sleep(5000);
-		final String finishedString = jwt.request().accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
+		final String finishedString = RESTCaller.request(jwt).accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
 		final IntermediarySimulationStatus statePersisted = om.readValue(finishedString, IntermediarySimulationStatus.class);
 
 		// if previousState == Error the state will be set to FINISHEDERROR within ms but not noticed to the state variable
@@ -97,14 +98,14 @@ public final class JobStateTest extends ServerTests {
 		final long jobid = ServerTestUtils.startSimulation(om.writeValueAsString(gpj));
 		final String testURI = ServerTestUtils.OPTIMISATION_URI + "/" + jobid + "/";
 		final JerseyWebTarget jwt = getJerseyClient().target(testURI);
-		String resultstring = jwt.request().accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
+		String resultstring = RESTCaller.request(jwt).accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
 
 		IntermediarySimulationStatus iss = om.readValue(resultstring, IntermediarySimulationStatus.class);
 		State state = iss.getState();
 		State previousState = state;
 		int previousYear = iss.getYearIndex();
 		while (state != State.FINISHED && state != State.ERROR && state != State.FINISHEDERROR) {
-			resultstring = jwt.request().accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
+			resultstring = RESTCaller.request(jwt).accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
 			iss = om.readValue(resultstring, IntermediarySimulationStatus.class);
 			final UserDefinedDescription description = iss.getDescription();
 			assertEqualDescription(description);
@@ -117,7 +118,7 @@ public final class JobStateTest extends ServerTests {
 			LOG.debug("State: {} Vorhergehender Status: {}", state, previousState);
 		}
 		Thread.sleep(5000);
-		final String finishedString = jwt.request().accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
+		final String finishedString = RESTCaller.request(jwt).accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
 		final IntermediarySimulationStatus statePersisted = om.readValue(finishedString, IntermediarySimulationStatus.class);
 
 		LOG.debug("statePersisted: {}", statePersisted);

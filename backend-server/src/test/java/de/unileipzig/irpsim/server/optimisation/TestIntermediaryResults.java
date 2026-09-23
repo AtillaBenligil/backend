@@ -15,6 +15,7 @@ import org.junit.Test;
 
 import de.unileipzig.irpsim.core.utils.TestFiles;
 import de.unileipzig.irpsim.server.utils.ServerTestUtils;
+import de.unileipzig.irpsim.server.utils.RESTCaller;
 import de.unileipzig.irpsim.server.utils.ServerTests;
 
 /**
@@ -37,7 +38,7 @@ public final class TestIntermediaryResults extends ServerTests {
 		LOG.trace("Anfrage: " + content);
 
 		JerseyWebTarget jwt = jc.target(ServerTestUtils.OPTIMISATION_URI + "?type=Basismodell&onlystart=true");
-		Response response = jwt.request().accept(MediaType.APPLICATION_JSON).post(Entity.entity(content, MediaType.APPLICATION_JSON), Response.class);
+		Response response = RESTCaller.request(jwt).accept(MediaType.APPLICATION_JSON).post(Entity.entity(content, MediaType.APPLICATION_JSON), Response.class);
 		final String startstring = response.readEntity(String.class);
 		LOG.debug("Start: {}", startstring);
 		final JSONArray jsa = new JSONArray(startstring);
@@ -47,7 +48,7 @@ public final class TestIntermediaryResults extends ServerTests {
 		final String uri = ServerTestUtils.OPTIMISATION_URI + "/" + jsa.getInt(0) + "/results";
 		LOG.info("Anfrage-URI:" + uri);
 		jwt = jc.target(uri);
-		response = jwt.request().accept(MediaType.APPLICATION_JSON).get();
+		response = RESTCaller.request(jwt).accept(MediaType.APPLICATION_JSON).get();
 		final String resultstring = response.readEntity(String.class);
 		// logger.debug("GET: " + resultstring + " " + resultstring.getClass());
 

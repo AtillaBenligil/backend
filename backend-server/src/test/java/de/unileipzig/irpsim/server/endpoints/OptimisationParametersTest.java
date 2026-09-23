@@ -158,7 +158,7 @@ public final class OptimisationParametersTest extends ServerTests {
          + "        }\n"
          + "    ]"
          + "}";
-   private static final String EXAMPLEPARAMETERSET = "{\"name\": \"testKonfig\", \"data\": "
+   public static final String EXAMPLEPARAMETERSET = "{\"name\": \"testKonfig\", \"data\": "
          + "{\"models\": [" + EXAMPLEPARAMETERS + "] }"
          + " }";
    private static final String EXAMPLEPARAMETERSET2 = "{\"name\": \"testKonfig2\",  \"data\": "
@@ -209,7 +209,7 @@ public final class OptimisationParametersTest extends ServerTests {
       final JSONObject jsa = getParameterSets();
       Assert.assertNotNull(jsa.get("" + initid));
       final JerseyWebTarget jwt = getJerseyClient().target(ServerTestUtils.SZENARIEN_URI + "/" + initid);
-      final Response response = jwt.request().get();
+      final Response response = RESTCaller.request(jwt).get();
 
       final String entity = response.readEntity(String.class);
       LOG.debug("Antwort: {}", entity.substring(0, 100));
@@ -264,7 +264,7 @@ public final class OptimisationParametersTest extends ServerTests {
       LOG.debug("EXAMPLEPARAMETERSET: {}", EXAMPLEPARAMETERSET);
       LOG.debug("uri: {}", ServerTestUtils.SZENARIEN_URI + "?name=test");
       JerseyWebTarget jwt = getJerseyClient().target(ServerTestUtils.SZENARIEN_URI + "?name=test");
-      Response response = jwt.request().put(Entity.entity(EXAMPLEPARAMETERSET, MediaType.APPLICATION_JSON));
+      Response response = RESTCaller.request(jwt).put(Entity.entity(EXAMPLEPARAMETERSET, MediaType.APPLICATION_JSON));
       Assert.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
       String entity = response.readEntity(String.class);
       final JSONObject jso = new JSONObject(entity);
@@ -273,7 +273,7 @@ public final class OptimisationParametersTest extends ServerTests {
       final JSONObject jsa = getParameterSets();
       Assert.assertNotNull(jsa.get("" + id));
       jwt = getJerseyClient().target(ServerTestUtils.SZENARIEN_URI + "/" + id);
-      response = jwt.request().get();
+      response = RESTCaller.request(jwt).get();
       entity = response.readEntity(String.class);
 
       final ObjectMapper om = new ObjectMapper();
@@ -283,13 +283,13 @@ public final class OptimisationParametersTest extends ServerTests {
 
       LOG.debug("Lade Daten mit Id: {}", id);
       jwt = getJerseyClient().target(ServerTestUtils.SZENARIEN_URI + "/" + id);
-      response = jwt.request().delete();
+      response = RESTCaller.request(jwt).delete();
 
       LOG.debug("Antwort: " + response.readEntity(String.class));
       Assert.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
 
       jwt = getJerseyClient().target(ServerTestUtils.SZENARIEN_URI + "/" + id);
-      response = jwt.request().get();
+      response = RESTCaller.request(jwt).get();
       entity = response.readEntity(String.class);
 
       Assert.assertNotEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -303,7 +303,7 @@ public final class OptimisationParametersTest extends ServerTests {
       LOG.debug("text: {}", EXAMPLE_UNDELETABLE);
       LOG.debug("uri: {}", ServerTestUtils.SZENARIEN_URI + "?name=test");
       JerseyWebTarget jwt = getJerseyClient().target(ServerTestUtils.SZENARIEN_URI + "?name=test");
-      Response response = jwt.request().put(Entity.entity(EXAMPLE_UNDELETABLE, MediaType.APPLICATION_JSON));
+      Response response = RESTCaller.request(jwt).put(Entity.entity(EXAMPLE_UNDELETABLE, MediaType.APPLICATION_JSON));
       Assert.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
       String entity = response.readEntity(String.class);
       final JSONObject jso = new JSONObject(entity);
@@ -312,7 +312,7 @@ public final class OptimisationParametersTest extends ServerTests {
       final JSONObject parameterSets = getParameterSets();
       Assert.assertNotNull(parameterSets.get("" + id));
       jwt = getJerseyClient().target(ServerTestUtils.SZENARIEN_URI + "/" + id);
-      response = jwt.request().get();
+      response = RESTCaller.request(jwt).get();
       entity = response.readEntity(String.class);
 
       final ObjectMapper om = new ObjectMapper();
@@ -322,13 +322,13 @@ public final class OptimisationParametersTest extends ServerTests {
 
       LOG.debug("Lade Daten mit Id: {}", id);
       jwt = getJerseyClient().target(ServerTestUtils.SZENARIEN_URI + "/" + id);
-      response = jwt.request().delete();
+      response = RESTCaller.request(jwt).delete();
 
       LOG.debug("Antwort: " + response.readEntity(String.class));
       Assert.assertNotEquals(Response.Status.OK.getStatusCode(), response.getStatus());
 
       jwt = getJerseyClient().target(ServerTestUtils.SZENARIEN_URI + "/" + id);
-      response = jwt.request().get();
+      response = RESTCaller.request(jwt).get();
       entity = response.readEntity(String.class);
 
       Assert.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());

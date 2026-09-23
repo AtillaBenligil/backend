@@ -48,7 +48,7 @@ public class ModelDiffEndpointTest extends ServerTests {
       final long jobid = ServerTestUtils.startSimulation(om.writeValueAsString(gpj));
       final String testURI = ServerTestUtils.OPTIMISATION_URI + "/" + jobid + "/";
       final JerseyWebTarget jwt = getJerseyClient().target(testURI);
-      String resultstring = jwt.request().accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
+      String resultstring = RESTCaller.request(jwt).accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
 
       waitUntilJobIsDone(jwt, resultstring);
 
@@ -57,7 +57,7 @@ public class ModelDiffEndpointTest extends ServerTests {
       final long jobid2 = ServerTestUtils.startSimulation(om.writeValueAsString(gpj2));
       final String testURI2 = ServerTestUtils.OPTIMISATION_URI + "/" + jobid2 + "/";
       final JerseyWebTarget jwt2 = getJerseyClient().target(testURI2);
-      String resultstring2 = jwt2.request().accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
+      String resultstring2 = RESTCaller.request(jwt2).accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
 
       waitUntilJobIsDone(jwt2,resultstring2);
 
@@ -90,7 +90,7 @@ public class ModelDiffEndpointTest extends ServerTests {
       State state = iss.getState();
       while (state != State.FINISHED && state != State.ERROR && state != State.FINISHEDERROR) {
 
-         resultstring = jwt.request().accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
+         resultstring = RESTCaller.request(jwt).accept(MediaType.APPLICATION_JSON).get().readEntity(String.class);
          iss = om.readValue(resultstring, IntermediarySimulationStatus.class);
          state = iss.getState();
          LOG.info("Jobs ("+iss.getId()+") State: " + iss.getState());

@@ -125,7 +125,7 @@ public abstract class ServerTests {
 	protected final JSONObject getParameterSets() {
       LOG.debug("uri: {}", ServerTestUtils.SZENARIEN_URI);
 		final JerseyWebTarget jwt = jc.target(ServerTestUtils.SZENARIEN_URI);
-		final Response response = jwt.request().get();
+		final Response response = RESTCaller.request(jwt).get();
 
 		final String loadstring = response.readEntity(String.class);
 		LOG.trace("Antwort: {}", loadstring);
@@ -137,7 +137,7 @@ public abstract class ServerTests {
 	protected final JSONObject getParameterSetsFiltered(int modeldefinition) {
       LOG.debug("uri: {}", ServerTestUtils.SZENARIEN_URI + "?modeldefinition=" + modeldefinition);
       final JerseyWebTarget jwt = jc.target(ServerTestUtils.SZENARIEN_URI + "?modeldefinition=" + modeldefinition);
-      final Response response = jwt.request().get();
+      final Response response = RESTCaller.request(jwt).get();
 
       final String loadstring = response.readEntity(String.class);
       LOG.trace("Antwort: {}", loadstring);
