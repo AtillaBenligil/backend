@@ -1,7 +1,10 @@
 package de.unileipzig.irpsim.server.security;
 
+import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import javax.naming.Context;
@@ -28,6 +31,11 @@ import org.apache.logging.log4j.Logger;
  * werden die Gruppen des Benutzers ermittelt, da die Rechteprüfung der
  * Szenarien und Simulationen auf diesen Gruppen aufsetzt.
  *
+ * Ist ein Dienstkonto konfiguriert, werden die Gruppen unter diesem gelesen
+ * und nicht unter dem Benutzer selbst. OpenLDAP erlaubt normalen Benutzern in
+ * der Standardeinstellung nur den eigenen Eintrag; die Gruppensuche würde dort
+ * scheitern und damit jede Anmeldung verhindern.
+ *
  * @author benligil
  */
 public final class JndiLdapAuthenticator implements LdapAuthenticator {
@@ -38,6 +46,8 @@ public final class JndiLdapAuthenticator implements LdapAuthenticator {
    private static final String PASSWORD_ATTRIBUTE = "userPassword";
    private static final String GROUP_NAME_ATTRIBUTE = "cn";
    private static final String GROUP_MEMBER_FILTER = "(member={0})";
+   private static final String USER_NAME_ATTRIBUTE = "uid";
+   private static final String USER_MAIL_FILTER = "(mail={0})";
 
    private final LdapConfiguration configuration;
 
@@ -48,6 +58,12 @@ public final class JndiLdapAuthenticator implements LdapAuthenticator {
     */
    public JndiLdapAuthenticator(final LdapConfiguration configuration) {
       this.configuration = configuration;
+      if (configuration.hasServiceAccount()) {
+         LOG.info("Gruppensuche über das Dienstkonto {}", configuration.getBindDn());
+      } else {
+         LOG.warn("Kein Dienstkonto konfiguriert ({}, {}); die Gruppen werden unter dem angemeldeten Benutzer gelesen",
+               LdapConfiguration.ENV_BIND_DN, LdapConfiguration.ENV_BIND_PASSWORD);
+      }
    }
 
    @Override
@@ -94,6 +110,46 @@ public final class JndiLdapAuthenticator implements LdapAuthenticator {
       }
    }
 
+   @Override
+   public Optional<String> findUsernameByMail(final String mail) throws AuthenticationException {
+      if (mail == null || mail.trim().isEmpty()) {
+         return Optional.empty();
+      }
+      if (!configuration.hasServiceAccount()) {
+         throw new AuthenticationException("Ohne Dienstkonto kann das Verzeichnis nicht durchsucht werden");
+      }
+      DirContext context = null;
+      try {
+         context = bindServiceAccount();
+         final SearchControls controls = new SearchControls();
+         controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
+         controls.setReturningAttributes(new String[] { USER_NAME_ATTRIBUTE });
+         final List<String> usernames = new ArrayList<>();
+         final NamingEnumeration<SearchResult> results = context.search(configuration.getUserSearchBase(), USER_MAIL_FILTER,
+               new Object[] { mail.trim() }, controls);
+         try {
+            while (results.hasMore()) {
+               final Attribute uid = results.next().getAttributes().get(USER_NAME_ATTRIBUTE);
+               if (uid != null && uid.get() != null) {
+                  usernames.add(uid.get().toString());
+               }
+            }
+         } finally {
+            results.close();
+         }
+         if (usernames.size() > 1) {
+            // Bei mehrdeutigen Adressen wird bewusst niemandem ein Recht eingeräumt.
+            LOG.warn("E-Mail-Adresse {} ist mehreren Benutzern zugeordnet: {}", mail, usernames);
+            return Optional.empty();
+         }
+         return usernames.stream().findFirst();
+      } catch (final NamingException e) {
+         throw new AuthenticationException("Suche nach " + mail + " fehlgeschlagen", e);
+      } finally {
+         close(context);
+      }
+   }
+
    /**
     * Baut eine authentifizierte Verbindung zum Verzeichnis auf.
     *
@@ -115,12 +171,55 @@ public final class JndiLdapAuthenticator implements LdapAuthenticator {
    /**
     * Ermittelt die Gruppen, in denen der Benutzer als Mitglied eingetragen ist.
     *
-    * @param context Der gebundene Verzeichniskontext
+    * Ist ein Dienstkonto konfiguriert, wird die Suche unter diesem ausgeführt,
+    * andernfalls unter dem bereits angemeldeten Benutzer.
+    *
+    * @param userContext Der mit den Zugangsdaten des Benutzers gebundene Kontext
     * @param userDn Der DN des Benutzers
     * @return Die Namen der Gruppen des Benutzers
     * @throws NamingException Falls die Suche fehlschlägt
     */
-   private Set<String> readGroups(final DirContext context, final String userDn) throws NamingException {
+   private Set<String> readGroups(final DirContext userContext, final String userDn) throws NamingException {
+      if (!configuration.hasServiceAccount()) {
+         return searchGroups(userContext, userDn);
+      }
+      DirContext serviceContext = null;
+      try {
+         serviceContext = bindServiceAccount();
+         return searchGroups(serviceContext, userDn);
+      } finally {
+         close(serviceContext);
+      }
+   }
+
+   /**
+    * Meldet das Dienstkonto am Verzeichnis an.
+    *
+    * Ein Fehlschlag ist hier ein Konfigurationsfehler und kein falsches
+    * Benutzerpasswort, daher wird er als Fehler protokolliert.
+    *
+    * @return Der mit dem Dienstkonto gebundene Kontext
+    * @throws NamingException Falls das Dienstkonto abgewiesen wird
+    */
+   private DirContext bindServiceAccount() throws NamingException {
+      try {
+         return bind(configuration.getBindDn(), configuration.getBindPassword());
+      } catch (final NamingException e) {
+         LOG.error("Das Dienstkonto {} wurde vom Verzeichnis abgewiesen; {} und {} prüfen", configuration.getBindDn(),
+               LdapConfiguration.ENV_BIND_DN, LdapConfiguration.ENV_BIND_PASSWORD);
+         throw e;
+      }
+   }
+
+   /**
+    * Sucht die Gruppen, in denen der Benutzer als Mitglied eingetragen ist.
+    *
+    * @param context Der gebundene Verzeichniskontext, unter dem gesucht wird
+    * @param userDn Der DN des Benutzers
+    * @return Die Namen der Gruppen des Benutzers
+    * @throws NamingException Falls die Suche fehlschlägt
+    */
+   private Set<String> searchGroups(final DirContext context, final String userDn) throws NamingException {
       final Set<String> groups = new LinkedHashSet<>();
       final SearchControls controls = new SearchControls();
       controls.setSearchScope(SearchControls.SUBTREE_SCOPE);

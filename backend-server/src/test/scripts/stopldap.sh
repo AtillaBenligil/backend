@@ -7,6 +7,10 @@
 name=`cat ldap.txt`
 docker stop $name
 
+# Ohne laufenden Server darf keine URL zurueckbleiben, sonst versuchen spaetere
+# Testlaeufe ohne gestarteten Server, sich mit dem beendeten zu verbinden.
+rm -f ldapurl.txt
+
 name2=$name
 rename=1
 count=0

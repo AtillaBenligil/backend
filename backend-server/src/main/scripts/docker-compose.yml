@@ -31,6 +31,12 @@ services:
       LDAP_CONFIG_PASSWORD: "1rps1m"
       LDAP_RFC2307BIS_SCHEMA: "true"
       LDAP_REMOVE_CONFIG_AFTER_SETUP: "false"
+      # Lesendes Dienstkonto cn=readonly, ueber das das Backend die Gruppen
+      # liest (IRPSIM_LDAP_BIND_DN / IRPSIM_LDAP_BIND_PASSWORD). Normale
+      # Benutzer duerfen in OpenLDAP nur ihren eigenen Eintrag lesen.
+      LDAP_READONLY_USER: "true"
+      LDAP_READONLY_USER_USERNAME: "readonly"
+      LDAP_READONLY_USER_PASSWORD: "r3ad0nly"
     command: ["--copy-service"]
     ports:
       - "10389:389"
