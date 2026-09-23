@@ -36,6 +36,7 @@ import de.unileipzig.irpsim.server.optimisation.queue.OptimisationJobHandler;
 import de.unileipzig.irpsim.server.security.AuthenticationFilter;
 import de.unileipzig.irpsim.server.security.ResourceAuthorizationFilter;
 import de.unileipzig.irpsim.server.security.SecurityComponents;
+import de.unileipzig.irpsim.server.security.StandingDataOwnershipMigration;
 import io.swagger.jaxrs.config.BeanConfig;
 import io.swagger.jaxrs.listing.ApiListingResource;
 import io.swagger.jaxrs.listing.SwaggerSerializers;
@@ -213,6 +214,9 @@ public final class ServerStarter {
 			DataLoader.initializeTimeseriesTables();
 			new StandardszenarioImporter().initializeScenarios();
 			ScenarioVersionUpdater.update();
+			// Die früheren verantwortlichen Personen der Stammdaten werden in die
+			// Rechteverwaltung übernommen; bereits übernommene werden übersprungen.
+			StandingDataOwnershipMigration.runAtStartup();
 			new Cleaner().deleteNonReferencedData();
 
 			synchronizeJobsFromDatabase();

@@ -39,6 +39,7 @@ import org.hibernate.Transaction;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import de.unileipzig.irpsim.core.security.ResourceType;
 import de.unileipzig.irpsim.core.simulation.data.persistence.ClosableEntityManager;
 import de.unileipzig.irpsim.core.simulation.data.persistence.ClosableEntityManagerProxy;
 import de.unileipzig.irpsim.core.standingdata.StaticDataUtil;
@@ -47,6 +48,7 @@ import de.unileipzig.irpsim.core.standingdata.data.AlgebraicData;
 import de.unileipzig.irpsim.core.standingdata.data.Datensatz;
 import de.unileipzig.irpsim.core.standingdata.data.Stammdatum;
 import de.unileipzig.irpsim.server.data.Responses;
+import de.unileipzig.irpsim.server.security.ResourceAccess;
 import de.unileipzig.irpsim.server.standingdata.endpoints.utils.AlgebraicDataUpdater;
 import de.unileipzig.irpsim.server.standingdata.excel.ImportTemplateGenerator;
 import io.swagger.annotations.Api;
@@ -202,8 +204,6 @@ public class StammdatumEntityEndpoint {
 				et.begin();
 				System.out.println("Objekt: " + MAPPER.writeValueAsString(stammdatum));
 				old.copyFrom(stammdatum);
-				em.persist(old.getVerantwortlicherBezugsjahr());
-				em.persist(old.getVerantwortlicherPrognosejahr());
 				session.update(old);
 				et.commit();
 
@@ -286,6 +286,9 @@ public class StammdatumEntityEndpoint {
 		}
 		s.delete(deleteStammdatum);
 		t.commit();
+		// Die Rechte des gelöschten Stammdatums werden mit entfernt, damit keine
+		// verwaisten Einträge zurückbleiben.
+		ResourceAccess.getService().revokeAll(ResourceType.STAMMDATUM, id);
 		return Responses.okResponse("Löschen erfolgreich", "Stammdatum erfolgreich gelöscht.");
 	}
 

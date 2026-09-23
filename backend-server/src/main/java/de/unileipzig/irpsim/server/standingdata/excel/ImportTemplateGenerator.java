@@ -410,10 +410,6 @@ public class ImportTemplateGenerator {
 		// sd_therm.setName("Elektrisches Lastprofil2");
 		sd_therm.setTyp("par_L_DS_G");
 		// sd_therm.setTyp("par_L_DS_E");
-		sd_therm.getVerantwortlicherBezugsjahr().setName("schulze");
-		sd_therm.getVerantwortlicherBezugsjahr().setEmail("schulze@test.de");
-		sd_therm.getVerantwortlicherPrognosejahr().setName("meier");
-		sd_therm.getVerantwortlicherPrognosejahr().setEmail("meier@test.de");
 
 		final List<Integer> szenarien = new LinkedList<>();
 		szenarien.add(1);

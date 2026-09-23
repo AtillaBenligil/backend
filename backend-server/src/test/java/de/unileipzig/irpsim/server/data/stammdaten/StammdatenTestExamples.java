@@ -12,10 +12,6 @@ public class StammdatenTestExamples {
 		sd_therm.setZeitintervall(TimeInterval.DAY);
 		sd_therm.setName("Thermisches Lastprofil");
 		sd_therm.setTyp("par_L_DS_G");
-		sd_therm.getVerantwortlicherBezugsjahr().setName("schulze");
-		sd_therm.getVerantwortlicherBezugsjahr().setEmail("schulze@test.de");
-		sd_therm.getVerantwortlicherPrognosejahr().setName("meier");
-		sd_therm.getVerantwortlicherPrognosejahr().setEmail("meier@test.de");
 		sd_therm.setStandardszenario(false);
 
 		return sd_therm;
@@ -28,10 +24,6 @@ public class StammdatenTestExamples {
 		sd_el.setZeitintervall(TimeInterval.DAY);
 		sd_el.setName("Elektrisches Lastprofil");
 		sd_el.setTyp("par_L_DS_E");
-		sd_el.getVerantwortlicherBezugsjahr().setName("schulze");
-		sd_el.getVerantwortlicherBezugsjahr().setEmail("schulze@test.de");
-		sd_el.getVerantwortlicherPrognosejahr().setName("meier");
-		sd_el.getVerantwortlicherPrognosejahr().setEmail("meier@test.de");
 		return sd_el;
 	}
 
@@ -41,10 +33,6 @@ public class StammdatenTestExamples {
 		sd_el.setPrognoseHorizont(10);
 		sd_el.setName("Elektrisches Lastprofil Fehlend");
 		sd_el.setTyp("par_L_DS_E");
-		sd_el.getVerantwortlicherBezugsjahr().setName("mueller");
-		sd_el.getVerantwortlicherBezugsjahr().setEmail("mueller@test.de");
-		sd_el.getVerantwortlicherPrognosejahr().setName("meier");
-		sd_el.getVerantwortlicherPrognosejahr().setEmail("meier@test.de");
 		return sd_el;
 	}
 
@@ -54,10 +42,6 @@ public class StammdatenTestExamples {
 		sd_last.setPrognoseHorizont(10);
 		sd_last.setName("Lastprofil");
 		sd_last.setTyp("par_L_DS");
-		sd_last.getVerantwortlicherBezugsjahr().setName("mueller");
-		sd_last.getVerantwortlicherBezugsjahr().setEmail("mueller@test.de");
-		sd_last.getVerantwortlicherPrognosejahr().setName("meier");
-		sd_last.getVerantwortlicherPrognosejahr().setEmail("meier@test.de");
 		return sd_last;
 
 	}

@@ -71,11 +71,20 @@ public class Stammdatum {
 
 	private boolean standardszenario = false;
 
+	/*
+	 * Die verantwortlichen Personen wurden durch die Rechteverwaltung ersetzt
+	 * (siehe StandingDataOwnershipMigration). Die Felder bleiben nur erhalten,
+	 * damit bestehende Zuordnungen einmalig in Zugriffsrechte übernommen werden
+	 * können; über die Schnittstelle sind sie weder sichtbar noch änderbar, und
+	 * neue Stammdaten erhalten keine Personen mehr.
+	 */
 	@ManyToOne(cascade = CascadeType.ALL)
-	private Person verantwortlicherPrognosejahr = new Person();
+	@JsonIgnore
+	private Person verantwortlicherPrognosejahr;
 
 	@ManyToOne(cascade = CascadeType.ALL)
-	private Person verantwortlicherBezugsjahr = new Person();
+	@JsonIgnore
+	private Person verantwortlicherBezugsjahr;
 
 	private String setName1;
 	private String setName2;
@@ -127,16 +136,13 @@ public class Stammdatum {
 		this.vollstaendig = another.vollstaendig;
 	}
 
-	public Stammdatum(final String name, final String typ, final String verantwortlicherBezugsjahrEmail,
-			final String verantwortlicherPrognosejahrEmail, final TimeInterval zeitintervall, final int bezugsjahr,
+	public Stammdatum(final String name, final String typ, final TimeInterval zeitintervall, final int bezugsjahr,
 			final int prognoseHorizont, final String[] szenarien) {
 		this.name = name;
 		this.typ = typ;
 		this.zeitintervall = zeitintervall;
 		this.bezugsjahr = bezugsjahr;
 		this.prognoseHorizont = prognoseHorizont;
-		this.verantwortlicherBezugsjahr.setEmail(verantwortlicherBezugsjahrEmail);
-		this.verantwortlicherPrognosejahr.setEmail(verantwortlicherPrognosejahrEmail);
 	}
 
 	@JsonIgnore
@@ -205,6 +211,11 @@ public class Stammdatum {
 		this.bezugsjahr = bezugsjahr;
 	}
 
+	/**
+	 * @return Die frühere verantwortliche Person; nur noch für die Übernahme in die Rechteverwaltung
+	 */
+	@JsonIgnore
+	@Deprecated
 	public Person getVerantwortlicherPrognosejahr() {
 		return verantwortlicherPrognosejahr;
 	}
@@ -217,14 +228,23 @@ public class Stammdatum {
 		this.standardszenario = standardszenario;
 	}
 
+	@JsonIgnore
+	@Deprecated
 	public void setVerantwortlicherPrognosejahr(final Person verantwortlicherPrognosejahr) {
 		this.verantwortlicherPrognosejahr = verantwortlicherPrognosejahr;
 	}
 
+	/**
+	 * @return Die frühere verantwortliche Person; nur noch für die Übernahme in die Rechteverwaltung
+	 */
+	@JsonIgnore
+	@Deprecated
 	public Person getVerantwortlicherBezugsjahr() {
 		return verantwortlicherBezugsjahr;
 	}
 
+	@JsonIgnore
+	@Deprecated
 	public void setVerantwortlicherBezugsjahr(final Person verantwortlicherBezugsjahr) {
 		this.verantwortlicherBezugsjahr = verantwortlicherBezugsjahr;
 	}
@@ -270,8 +290,9 @@ public class Stammdatum {
 		setAbstrakt(data.isAbstrakt());
 		setBezugsjahr(data.getBezugsjahr());
 		setPrognoseHorizont(data.getPrognoseHorizont());
-		setVerantwortlicherBezugsjahr(data.getVerantwortlicherBezugsjahr());
-		setVerantwortlicherPrognosejahr(data.getVerantwortlicherPrognosejahr());
+		// Die früheren verantwortlichen Personen werden bewusst nicht übernommen:
+		// Sie kommen nicht mehr über die Schnittstelle und würden sonst vor ihrer
+		// Übernahme in die Rechteverwaltung mit leeren Werten überschrieben.
 		setReferenz(data.getReferenz());
 		setSetName1(data.getSetName1());
 		setSetName2(data.getSetName2());

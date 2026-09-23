@@ -97,10 +97,6 @@ public class TestStammdaten extends ServerTests {
 		final String bezugsjahr2String = getBezugsjahr2Response.readEntity(String.class);
 		MatcherAssert.assertThat(bezugsjahr2String, JsonMatchers.jsonEquals("[]"));
 
-		final Response getEmailResponse = RESTCaller.callGetResponse(ServerTestUtils.URI + "stammdaten?verantwortlicherBezugsjahrEmail=mueller");
-		final String emailString = getEmailResponse.readEntity(String.class);
-		MatcherAssert.assertThat(emailString, JsonMatchers.jsonEquals("[" + id_load + "]").when(Option.IGNORING_ARRAY_ORDER));
-
 		final Response getReferenzResponse = RESTCaller.callGetResponse(ServerTestUtils.URI + "stammdaten?referenz=" + id_load);
 		final String referenzString = getReferenzResponse.readEntity(String.class);
 		MatcherAssert.assertThat(referenzString, JsonMatchers.jsonEquals("[" + id_therm + "]"));
@@ -121,8 +117,6 @@ public class TestStammdaten extends ServerTests {
 
 		MatcherAssert.assertThat(returnString, Matchers.containsString("" + id));
 
-		thermalLoad.getVerantwortlicherBezugsjahr().setEmail("hans@meier.com");
-		thermalLoad.getVerantwortlicherBezugsjahr().setName("Hans Meier");
 		thermalLoad.setTyp("par_F_SMS_E");
 		thermalLoad.setStandardszenario(true);
 
@@ -133,7 +127,9 @@ public class TestStammdaten extends ServerTests {
 		final Response getResponseChanged = RESTCaller.callGetResponse(ServerTestUtils.URI + "stammdaten/" + id);
 		final String returnStringChanged = getResponseChanged.readEntity(String.class);
 
-		MatcherAssert.assertThat(returnStringChanged, JsonMatchers.jsonPartEquals("verantwortlicherBezugsjahr.name", "Hans Meier"));
+		// Die verantwortlichen Personen sind durch die Rechteverwaltung ersetzt und
+		// erscheinen nicht mehr in der Schnittstelle.
+		MatcherAssert.assertThat(returnStringChanged, Matchers.not(Matchers.containsString("verantwortlicher")));
 		MatcherAssert.assertThat(returnStringChanged, JsonMatchers.jsonPartEquals("typ", "par_F_SMS_E"));
 		MatcherAssert.assertThat(returnStringChanged, JsonMatchers.jsonPartEquals("standardszenario", "true"));
 	}

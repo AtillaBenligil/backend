@@ -7,8 +7,10 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -46,7 +48,14 @@ public class ConcreteDataEndpoint {
 			@ApiParam(name = "seriesid", value = "Definiert das Datum, ab dem Zeitreihendaten zurückgegeben werden sollen") @QueryParam("seriesid") final List<Integer> seriesids,
 			@ApiParam(name = "start", value = "Definiert das Datum, ab dem Zeitreihendaten zurückgegeben werden sollen; nur in Kombination mit Enddatum und maxcount nutzbar.") @QueryParam("start") final String start,
 			@ApiParam(name = "end", value = "Definiert das Datum, bis zu dem Zeitreihendaten zurückgegeben werden sollen; nur in Kombination mit Startdatum und maxcount nutzbar.") @QueryParam("end") final String end,
-			@ApiParam(name = "maxcount", value = "Definiert die maximale Anzahl an Werten, die zurückgegeben werden soll; nur in Kombination mit Start- und Enddatum nutzbar.") @QueryParam("maxcount") final int maxcount) {
+			@ApiParam(name = "maxcount", value = "Definiert die maximale Anzahl an Werten, die zurückgegeben werden soll; nur in Kombination mit Start- und Enddatum nutzbar.") @QueryParam("maxcount") final int maxcount,
+			@Context final SecurityContext securityContext) {
+		// Die Zeitreihen gehören zu Datensätzen und damit zu Stammdaten, deren
+		// Leserecht hier geprüft wird.
+		final Response refused = StandingDataAccess.checkDatensaetzeReadable(securityContext, seriesids);
+		if (refused != null) {
+			return refused;
+		}
 
 		try {
 			final Map<Integer, List<LoadElement>> timeseriesData;

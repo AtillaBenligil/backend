@@ -33,16 +33,18 @@ public class StammdatumImporter {
 	final class ImporterTask implements Runnable {
 
 		private final TransferData transferData;
+		private final String owner;
 
-		public ImporterTask(TransferData transferData) {
+		public ImporterTask(final TransferData transferData, final String owner) {
 			this.transferData = transferData;
+			this.owner = owner;
 		}
 
 		@Override
 		public void run() {
 			try {
 				LOG.debug("Starte import");
-				importSynchron(transferData);
+				importSynchron(transferData, owner);
 				LOG.debug("Import beendet");
 			} catch (final Throwable e) {
 				e.printStackTrace();
@@ -79,8 +81,8 @@ public class StammdatumImporter {
 	private StammdatumImporter() {
 	}
 
-	private Response importSynchron(final TransferData transferData) throws JsonProcessingException {
-		final TransferDataImporter importer = new TransferDataImporter(transferData);
+	private Response importSynchron(final TransferData transferData, final String owner) throws JsonProcessingException {
+		final TransferDataImporter importer = new TransferDataImporter(transferData, owner);
 		final List<ExistingStammdatum> existingData = importer.importTransferData();
 		if (transferData.getStammdaten().size() > 0) {
 			size = transferData.getStammdaten().size();
@@ -111,17 +113,21 @@ public class StammdatumImporter {
 		}
 	}
 
-	private Response importData(final TransferData transferData) {
-		final Thread importerThread = new Thread(new ImporterTask(transferData));
+	private Response importData(final TransferData transferData, final String owner) {
+		final Thread importerThread = new Thread(new ImporterTask(transferData, owner));
 		importerThread.start();
 		return Responses.okResponse("Import gestartet", "Import der Stammdaten erfolgreich angestoßen");
 	}
 
-	public static Response importPlainData(final TransferData transferData) throws JsonProcessingException {
+	/**
+	 * @param transferData Die zu importierenden Stammdaten
+	 * @param owner Der Benutzer, der das Schreibrecht an den importierten Stammdaten erhält
+	 */
+	public static Response importPlainData(final TransferData transferData, final String owner) throws JsonProcessingException {
 		final StammdatumImporter newInstance = getInstance();
 		if (newInstance != null) {
 			LOG.debug("Starte Plain-Import");
-			final Response response = newInstance.importData(transferData);
+			final Response response = newInstance.importData(transferData, owner);
 			return response;
 		} else {
 			String info = "Alter Import nicht abgeschlossen, Startdatum: "
@@ -131,7 +137,7 @@ public class StammdatumImporter {
 		}
 	}
 
-	public static Response importZIP(final InputStream fileInputStream)
+	public static Response importZIP(final InputStream fileInputStream, final String owner)
 			throws IOException, JsonParseException, JsonMappingException, JsonProcessingException {
 		final StammdatumImporter current = getInstance();
 		if (current != null) {
@@ -150,7 +156,7 @@ public class StammdatumImporter {
 					if (summarized.length() > 0) {
 						final TransferData transferData = StammdatumEntityEndpoint.MAPPER.readValue(summarized,
 								TransferData.class);
-						r = current.importData(transferData);
+						r = current.importData(transferData, owner);
 					}
 					LOG.debug("Reading finished");
 				}
