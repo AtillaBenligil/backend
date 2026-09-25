@@ -21,17 +21,31 @@ import de.unileipzig.irpsim.core.standingdata.AddData;
 import de.unileipzig.irpsim.core.standingdata.StaticDataUtil;
 import de.unileipzig.irpsim.core.standingdata.TimeseriesValue;
 import de.unileipzig.irpsim.core.standingdata.data.Stammdatum;
+import de.unileipzig.irpsim.core.security.Permission;
+import de.unileipzig.irpsim.core.security.ResourceType;
+import de.unileipzig.irpsim.core.security.SubjectType;
+import de.unileipzig.irpsim.server.security.ResourceAccess;
 
 public class TransferDataImporter {
 
 	private static final Logger LOG = LogManager.getLogger(TransferDataImporter.class);
 
 	private final TransferData transferData;
+	private final String owner;
 	private final Map<Integer, Integer> idChangeMapping = new HashMap<>();
 	private final Map<Integer, List<TransferDatensatz>> stammdatumDatensatzMap = new HashMap<>();
 
 	public TransferDataImporter(final TransferData transferData) {
+		this(transferData, null);
+	}
+
+	/**
+	 * @param transferData Die zu importierenden Stammdaten
+	 * @param owner Der Benutzer, der das Schreibrecht an den importierten Stammdaten erhält, oder null
+	 */
+	public TransferDataImporter(final TransferData transferData, final String owner) {
 		this.transferData = transferData;
+		this.owner = owner;
 
 		for (final Stammdatum stammdatum : transferData.getStammdaten()) {
 			stammdatumDatensatzMap.put(stammdatum.getId(), new LinkedList<>());
@@ -116,6 +130,12 @@ public class TransferDataImporter {
 		}
 
 		et.commit();
+
+		// Wie beim Anlegen erhält der Importierende das Schreibrecht; ohne
+		// Eintrag wären importierte Stammdaten für alle lesbar.
+		if (owner != null) {
+			ResourceAccess.getService().grant(ResourceType.STAMMDATUM, stammdatum.getId(), SubjectType.USER, owner, Permission.WRITE);
+		}
 
 		return stammdatum.getId();
 

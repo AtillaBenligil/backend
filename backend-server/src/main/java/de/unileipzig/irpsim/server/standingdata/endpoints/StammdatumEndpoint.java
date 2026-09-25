@@ -10,17 +10,21 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.SecurityContext;
 
 import org.hibernate.Criteria;
 import org.hibernate.Session;
+import org.hibernate.criterion.Criterion;
 import org.hibernate.criterion.Restrictions;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import de.unileipzig.irpsim.core.security.ResourceType;
 import de.unileipzig.irpsim.core.simulation.data.TimeInterval;
 import de.unileipzig.irpsim.core.simulation.data.persistence.ClosableEntityManager;
 import de.unileipzig.irpsim.core.simulation.data.persistence.ClosableEntityManagerProxy;
@@ -28,6 +32,7 @@ import de.unileipzig.irpsim.core.standingdata.StaticDataUtil;
 import de.unileipzig.irpsim.core.standingdata.SzenarioSet;
 import de.unileipzig.irpsim.core.standingdata.data.Stammdatum;
 import de.unileipzig.irpsim.server.data.Responses;
+import de.unileipzig.irpsim.server.security.ResourceAccess;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -58,16 +63,17 @@ public class StammdatumEndpoint {
 			@ApiParam(name = "typ", value = "Definiert einen Filter für den Typ des Stammdatums.") @QueryParam("typ") final String typ,
 			@ApiParam(name = "zeitintervall", value = "Definiert das Datum, ab dem Zeitreihendaten zurückgegeben werden sollen") @QueryParam("zeitintervall") final TimeInterval zeitintervall,
 			@ApiParam(name = "referenz", value = "Definiert die Referenz der angeforderten Stammdaten.") @QueryParam("referenz") final Integer referenz,
-			@ApiParam(name = "verantwortlicherBezugsjahrEmail", value = "Definiert einen Filter für die Email des Verantwortlichen des Bezugsjahr des Stammdatums.") @QueryParam("verantwortlicherBezugsjahrEmail") final String verantwortlicherBezugsjahrEmail,
-			@ApiParam(name = "verantwortlicherBezugsjahrName", value = "Definiert einen Filter für den Namen des Verantwortlichen des Bezugsjahr des Stammdatums.") @QueryParam("verantwortlicherBezugsjahrName") final String verantwortlicherBezugsjahrName,
-			@ApiParam(name = "verantwortlicherPrognosejahrEmail", value = "Definiert einen Filter für die Email des Verantwortlichen des Prognosejahr des Stammdatums.") @QueryParam("verantwortlicherPrognosejahrEmail") final String verantwortlicherPrognosejahrEmail,
-			@ApiParam(name = "verantwortlicherPrognosejahrName", value = "Definiert einen Filter für den Namen des Verantwortlichen des Prognosejahr des Stammdatums.") @QueryParam("verantwortlicherPrognosejahrName") final String verantwortlicherPrognosejahrName,
-			@ApiParam(name = "maxcount", value = "Gibt die maximale Anzahl an Ergebnissen an, die zurückgegeben werden soll") @QueryParam("maxcount") final Integer maxcount)
+			@ApiParam(name = "maxcount", value = "Gibt die maximale Anzahl an Ergebnissen an, die zurückgegeben werden soll") @QueryParam("maxcount") final Integer maxcount,
+			@Context final SecurityContext securityContext)
 			throws JsonProcessingException {
 		try (final ClosableEntityManager em = ClosableEntityManagerProxy.newInstance()) {
 			final Session session = (Session) em.getDelegate();
-			final Criteria createCriteria = createQueryCriteria(id, abstrakt, bezugsjahr, prognoseHorizont, name, typ, zeitintervall, referenz, verantwortlicherBezugsjahrEmail,
-               verantwortlicherBezugsjahrName, verantwortlicherPrognosejahrEmail, verantwortlicherPrognosejahrName, maxcount, session);
+			final Criteria createCriteria = createQueryCriteria(id, abstrakt, bezugsjahr, prognoseHorizont, name, typ, zeitintervall, referenz, maxcount, session);
+			// Nicht sichtbare Stammdaten werden bereits von der Datenbank ausgeschlossen.
+			final Criterion visibility = ResourceAccess.visibilityCriterion("id", ResourceType.STAMMDATUM, securityContext, Long::intValue);
+			if (visibility != null) {
+				createCriteria.add(visibility);
+			}
 			final List<Stammdatum> stammdaten = createCriteria.list();
 			String result;
 			if (all != null && all == true) {
@@ -85,8 +91,7 @@ public class StammdatumEndpoint {
 	}
 
    private Criteria createQueryCriteria(final Integer id, final Boolean abstrakt, final Integer bezugsjahr, final Integer prognoseHorizont, final String name, final String typ,
-         final TimeInterval zeitintervall, final Integer referenz, final String verantwortlicherBezugsjahrEmail, final String verantwortlicherBezugsjahrName,
-         final String verantwortlicherPrognosejahrEmail, final String verantwortlicherPrognosejahrName, final Integer maxcount, final Session session) {
+         final TimeInterval zeitintervall, final Integer referenz, final Integer maxcount, final Session session) {
       final Criteria createCriteria = session.createCriteria(Stammdatum.class);
       if (id != null) {
       	createCriteria.add(Restrictions.eq("id", id));
@@ -113,22 +118,6 @@ public class StammdatumEndpoint {
       	final Criteria referenzCriteria = createCriteria.createCriteria("referenz");
       	referenzCriteria.add(Restrictions.eq("id", referenz));
       }
-      if (verantwortlicherBezugsjahrEmail != null) {
-      	final Criteria personCriteria = createCriteria.createCriteria("verantwortlicherBezugsjahr");
-      	personCriteria.add(Restrictions.ilike("email", "%" + verantwortlicherBezugsjahrEmail + "%"));
-      }
-      if (verantwortlicherBezugsjahrName != null) {
-      	final Criteria personCriteria = createCriteria.createCriteria("verantwortlicherBezugsjahr");
-      	personCriteria.add(Restrictions.ilike("name", "%" + verantwortlicherBezugsjahrName + "%"));
-      }
-      if (verantwortlicherPrognosejahrEmail != null) {
-      	final Criteria personCriteria = createCriteria.createCriteria("verantwortlicherPrognosejahr");
-      	personCriteria.add(Restrictions.ilike("email", "%" + verantwortlicherPrognosejahrEmail + "%"));
-      }
-      if (verantwortlicherPrognosejahrName != null) {
-      	final Criteria personCriteria = createCriteria.createCriteria("verantwortlicherPrognosejahr");
-      	personCriteria.add(Restrictions.ilike("name", "%" + verantwortlicherPrognosejahrName + "%"));
-      }
       if (maxcount != null && maxcount >= 1) {
       	createCriteria.setMaxResults(maxcount);
       }
@@ -138,7 +127,7 @@ public class StammdatumEndpoint {
 	@PUT
 	@Consumes(MediaType.APPLICATION_JSON)
 	@ApiOperation(value = "Fügt neues Stammdatum hinzu", notes = "Fügt Stammdaten hinzu. Sind sie bereits vorhanden, wird ein Fehler ausgegeben. Für das Ändern sollte der Endpunkt des Stammdatums angesprochen werden.")
-	public final Response putStammdatum(final Stammdatum stammdatum) throws JsonProcessingException {
+	public final Response putStammdatum(final Stammdatum stammdatum, @Context final SecurityContext securityContext) throws JsonProcessingException {
 		try (final ClosableEntityManager em = ClosableEntityManagerProxy.newInstance()) {
 			final Session s = (Session) em.getDelegate();
 			final List<Stammdatum> stammdatenIdentical = s.createCriteria(Stammdatum.class).add(Restrictions.eq("id", stammdatum.getId())).list();
@@ -168,10 +157,11 @@ public class StammdatumEndpoint {
 
 				final EntityTransaction et = em.getTransaction();
 				et.begin();
-				em.persist(stammdatum.getVerantwortlicherBezugsjahr());
-				em.persist(stammdatum.getVerantwortlicherPrognosejahr());
 				em.persist(stammdatum);
 				et.commit();
+				// Die Rechteverwaltung ersetzt die verantwortlichen Personen: wer
+				// ein Stammdatum anlegt, erhält das Schreibrecht daran.
+				ResourceAccess.grantOwnership(securityContext, ResourceType.STAMMDATUM, stammdatum.getId());
 				return Response.ok("[" + stammdatum.getId() + "]").build();
 			}
 		} catch (final Throwable t) {

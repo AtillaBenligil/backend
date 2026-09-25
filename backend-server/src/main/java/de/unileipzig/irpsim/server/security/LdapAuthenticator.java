@@ -40,4 +40,16 @@ public interface LdapAuthenticator {
     * @throws AuthenticationException Falls das bisherige Passwort falsch ist oder die Änderung abgelehnt wird
     */
    void changePassword(String username, String oldPassword, String newPassword) throws AuthenticationException;
+
+   /**
+    * Sucht den Anmeldenamen des Benutzers mit der angegebenen E-Mail-Adresse.
+    *
+    * Wird für die Übernahme der früheren verantwortlichen Personen benötigt,
+    * die nur über Name und E-Mail-Adresse erfasst waren.
+    *
+    * @param mail Die E-Mail-Adresse
+    * @return Der Anmeldename, falls genau ein Benutzer diese Adresse hat
+    * @throws AuthenticationException Falls das Verzeichnis nicht durchsucht werden kann
+    */
+   java.util.Optional<String> findUsernameByMail(String mail) throws AuthenticationException;
 }

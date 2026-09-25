@@ -14,8 +14,10 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -33,6 +35,7 @@ import de.unileipzig.irpsim.core.standingdata.data.AlgebraicData;
 import de.unileipzig.irpsim.core.standingdata.data.Stammdatum;
 import de.unileipzig.irpsim.core.standingdata.data.StaticData;
 import de.unileipzig.irpsim.server.data.Responses;
+import de.unileipzig.irpsim.server.security.ResourceAccess;
 import de.unileipzig.irpsim.server.standingdata.endpoints.data.ExportError;
 import de.unileipzig.irpsim.server.standingdata.transfer.TransferData;
 import de.unileipzig.irpsim.server.standingdata.transfer.TransferDatensatz;
@@ -55,10 +58,15 @@ public class StammdatumTransferEndpoint {
 	@ApiResponses(value = { @ApiResponse(code = 400, message = "Invalid ID supplied"),
 			@ApiResponse(code = 404, message = "Not Found") })
 	public final Response getStammdatumQueried(
-			@ApiParam(name = "ids", value = "Definiert, welche Stammdaten exportiert werden sollen") @QueryParam("ids") final List<Integer> ids) {
+			@ApiParam(name = "ids", value = "Definiert, welche Stammdaten exportiert werden sollen") @QueryParam("ids") final List<Integer> ids,
+			@Context final SecurityContext securityContext) {
 		try {
 			if (ids.size() < 1) {
 				return Responses.badRequestResponse("Mindestens eine ID muss übergeben werden!");
+			}
+			final Response refused = StandingDataAccess.checkStammdatenReadable(securityContext, ids);
+			if (refused != null) {
+				return refused;
 			}
 
 			final String resultString;
@@ -162,7 +170,8 @@ public class StammdatumTransferEndpoint {
 	@ApiResponses(value = { @ApiResponse(code = 400, message = "Invalid ID supplied"),
 			@ApiResponse(code = 404, message = "Not Found") })
 	public final Response addStammdaten(@FormDataParam("file") final InputStream fileInputStream,
-			@FormDataParam("file") final FormDataContentDisposition contentDispositionHeader) {
+			@FormDataParam("file") final FormDataContentDisposition contentDispositionHeader, @Context final SecurityContext securityContext) {
+		final String owner = ResourceAccess.username(securityContext);
 		try {
 
 			if (contentDispositionHeader.getFileName().endsWith(".sds")
@@ -170,10 +179,10 @@ public class StammdatumTransferEndpoint {
 				LOG.info("Reading JSON...");
 				TransferData transferData = StammdatumEntityEndpoint.MAPPER.readValue(fileInputStream,
 						TransferData.class);
-				return StammdatumImporter.importPlainData(transferData);
+				return StammdatumImporter.importPlainData(transferData, owner);
 			} else if (contentDispositionHeader.getFileName().endsWith(".zip")) {
 				LOG.info("Reading ZIP...");
-				return StammdatumImporter.importZIP(fileInputStream);
+				return StammdatumImporter.importZIP(fileInputStream, owner);
 			} else {
 				return Responses.okResponse("Typ unbekannt",
 						"Typ " + contentDispositionHeader.getFileName() + " unbekannt");

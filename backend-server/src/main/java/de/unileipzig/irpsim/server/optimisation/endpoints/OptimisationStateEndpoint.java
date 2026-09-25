@@ -3,6 +3,7 @@ package de.unileipzig.irpsim.server.optimisation.endpoints;
 import static de.unileipzig.irpsim.server.data.Responses.errorResponse;
 
 import java.util.*;
+import java.util.function.Function;
 
 import javax.persistence.Tuple;
 import javax.persistence.TypedQuery;
@@ -14,8 +15,10 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
 
 import de.unileipzig.irpsim.core.data.simulationparameters.OptimisationScenario;
 import de.unileipzig.irpsim.core.simulation.data.json.UserDefinedDescription;
@@ -28,6 +31,8 @@ import org.hibernate.criterion.Restrictions;
 import org.hibernate.transform.Transformers;
 
 import de.unileipzig.irpsim.core.Constants;
+import de.unileipzig.irpsim.core.security.Permission;
+import de.unileipzig.irpsim.core.security.ResourceType;
 import de.unileipzig.irpsim.core.simulation.data.json.IntermediarySimulationStatus;
 import de.unileipzig.irpsim.core.simulation.data.persistence.ClosableEntityManager;
 import de.unileipzig.irpsim.core.simulation.data.persistence.ClosableEntityManagerProxy;
@@ -36,6 +41,7 @@ import de.unileipzig.irpsim.core.simulation.data.persistence.OptimisationYearPer
 import de.unileipzig.irpsim.core.simulation.data.persistence.State;
 import de.unileipzig.irpsim.server.optimisation.Job;
 import de.unileipzig.irpsim.server.optimisation.queue.OptimisationJobHandler;
+import de.unileipzig.irpsim.server.security.ResourceAccess;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
@@ -60,12 +66,13 @@ public class OptimisationStateEndpoint {//TODO Umbenennen StateEndpoint
    @Produces(MediaType.APPLICATION_JSON)
    @ApiOperation(value = "Gibt die Stati aller Optimierungsjobs zurück.", notes = "Gibt die Stati aller Optimierungsjobs zurück. Dabei werden auch die benutzerdefinierten Daten ausgegeben.")
    @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok") })
-   public final Response getAllSimulationMetadata(@QueryParam("modeldefinition") int modeldefinition) {
+   public final Response getAllSimulationMetadata(@QueryParam("modeldefinition") int modeldefinition,
+         @Context final SecurityContext securityContext) {
       LOG.info("Getting states");
       try (final ClosableEntityManager em = ClosableEntityManagerProxy.newInstance()) {
          final Session session = em.unwrap(Session.class);
 
-         final List<OptimisationJobPersistent> persistentJobs = loadJobs(modeldefinition, session);
+         final List<OptimisationJobPersistent> persistentJobs = loadJobs(modeldefinition, session, securityContext);
          final Map<Long, OptimisationJobPersistent> allJobs = new HashMap<>();
          for (final OptimisationJobPersistent job : persistentJobs) {
             LOG.info("Job: {} Ende: {} Hinzufügen zum sortieren: {}", job.getId(), job.getEnd(), job.getEnd() != null && job.getState() == State.FINISHED);
@@ -73,7 +80,7 @@ public class OptimisationStateEndpoint {//TODO Umbenennen StateEndpoint
          }
          getYeardata(em, allJobs);
 
-         final List<IntermediarySimulationStatus> states = generateStatesList(allJobs);
+         final List<IntermediarySimulationStatus> states = generateStatesList(allJobs, securityContext);
 
          final String result = Constants.MAPPER.writeValueAsString(states);
          return Response.status(Response.Status.OK).entity(result).build();
@@ -83,9 +90,10 @@ public class OptimisationStateEndpoint {//TODO Umbenennen StateEndpoint
       }
    }
 
-   private List<IntermediarySimulationStatus> generateStatesList(final Map<Long, OptimisationJobPersistent> allJobs) {
+   private List<IntermediarySimulationStatus> generateStatesList(final Map<Long, OptimisationJobPersistent> allJobs,
+         final SecurityContext securityContext) {
       final List<IntermediarySimulationStatus> states = new ArrayList<>();
-      addActiveJobs(states, allJobs);
+      addActiveJobs(states, allJobs, securityContext);
       for (final OptimisationJobPersistent job : allJobs.values()) {
          states.add(job.getOptimisationState());
       }
@@ -113,8 +121,18 @@ public class OptimisationStateEndpoint {//TODO Umbenennen StateEndpoint
       }
    }
 
-   private void addActiveJobs(final List<IntermediarySimulationStatus> states, final Map<Long, OptimisationJobPersistent> allJobs) {
+   /**
+    * Ergänzt die laufenden Aufträge aus dem Arbeitsspeicher.
+    *
+    * Diese Aufträge stammen nicht aus der Datenbankabfrage und durchlaufen deren
+    * Sichtbarkeitsbedingung daher nicht; sie werden hier einzeln geprüft.
+    */
+   private void addActiveJobs(final List<IntermediarySimulationStatus> states, final Map<Long, OptimisationJobPersistent> allJobs,
+         final SecurityContext securityContext) {
       for (final Job job : OptimisationJobHandler.getInstance().getActiveJobs()) {
+         if (!ResourceAccess.isPermitted(securityContext, ResourceType.JOB, job.getId(), Permission.READ)) {
+            continue;
+         }
          final IntermediarySimulationStatus state = job.getIntermediaryState();
          if (!states.contains(state)) {
             states.add(state);
@@ -123,7 +141,7 @@ public class OptimisationStateEndpoint {//TODO Umbenennen StateEndpoint
       }
    }
 
-   private List<OptimisationJobPersistent> loadJobs(int modeldefinition, final Session session) {
+   private List<OptimisationJobPersistent> loadJobs(int modeldefinition, final Session session, final SecurityContext securityContext) {
 
       CriteriaBuilder builder = session.getCriteriaBuilder();
       CriteriaQuery<Tuple> query = builder.createQuery(Tuple.class);
@@ -146,8 +164,14 @@ public class OptimisationStateEndpoint {//TODO Umbenennen StateEndpoint
             queryRoot.get("simulationsteps").alias("simulationsteps"));
 
 
-      if (modeldefinition != 0)
-         query.where(likeRestrictions);
+      // Nicht sichtbare Aufträge werden bereits von der Datenbank ausgeschlossen.
+      final Predicate visibility = ResourceAccess.visibilityPredicate(builder, queryRoot.get("id"), ResourceType.JOB, securityContext,
+            Function.identity());
+      if (modeldefinition != 0) {
+         query.where(builder.and(likeRestrictions, visibility));
+      } else {
+         query.where(visibility);
+      }
 
       final List<Tuple> metaDataList = session.createQuery(query).getResultList();
       final List<OptimisationJobPersistent> jobsList = new LinkedList<>();

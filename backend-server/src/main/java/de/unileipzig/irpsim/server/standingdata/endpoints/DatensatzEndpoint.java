@@ -10,8 +10,10 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
 
 import org.hibernate.Criteria;
 import org.hibernate.Session;
@@ -25,7 +27,9 @@ import de.unileipzig.irpsim.core.simulation.data.persistence.ClosableEntityManag
 import de.unileipzig.irpsim.core.simulation.data.persistence.ClosableEntityManagerProxy;
 import de.unileipzig.irpsim.core.standingdata.data.Datensatz;
 import de.unileipzig.irpsim.core.standingdata.data.Stammdatum;
+import de.unileipzig.irpsim.core.security.ResourceType;
 import de.unileipzig.irpsim.server.data.Responses;
+import de.unileipzig.irpsim.server.security.ResourceAccess;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
@@ -41,12 +45,20 @@ public class DatensatzEndpoint {
    @ApiResponses(value = {
          @ApiResponse(code = 400, message = "Invalid IDs supplied"),
          @ApiResponse(code = 404, message = "Not Found") })
-   public Response getMultipleStammdatumForDatensatz(@QueryParam("id") final List<Integer> ids) {
+   public Response getMultipleStammdatumForDatensatz(@QueryParam("id") final List<Integer> ids, @Context final SecurityContext securityContext) {
+      final Response refused = StandingDataAccess.checkDatensaetzeReadable(securityContext, ids);
+      if (refused != null) {
+         return refused;
+      }
 
       try (final ClosableEntityManager em = ClosableEntityManagerProxy.newInstance()) {
          final Session session = (Session) em.getDelegate();
          if (ids.size() == 0) {
             final Map<Integer, List<Datensatz>> result = getAllDatensatz(session);
+            // Ohne Kennungen wird die Zuordnung aller Stammdaten geliefert; nicht
+            // sichtbare Stammdaten werden daraus entfernt.
+            final java.util.function.Predicate<Long> visible = ResourceAccess.visibilityFilter(securityContext, ResourceType.STAMMDATUM);
+            result.keySet().removeIf(stammdatumId -> !visible.test(stammdatumId.longValue()));
 
             final ObjectMapper mapper = new ObjectMapper();
             final String resultString = mapper.writerWithView(Object.class).writeValueAsString(result);

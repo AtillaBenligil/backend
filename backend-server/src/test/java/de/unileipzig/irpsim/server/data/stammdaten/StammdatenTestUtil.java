@@ -58,6 +58,9 @@ public class StammdatenTestUtil {
 			em.createNativeQuery("TRUNCATE TABLE " + SzenarioSet.class.getSimpleName()).executeUpdate();
 			em.createNativeQuery("TRUNCATE TABLE " + SzenarioSetElement.class.getSimpleName()).executeUpdate();
 			em.createNativeQuery("TRUNCATE TABLE Datensatz_Variable").executeUpdate();
+			// Die Kennungen beginnen nach dem Leeren wieder bei 1; ohne diese Zeile
+			// erbten neue Ressourcen die Rechte gelöschter Ressourcen gleicher Kennung.
+			em.createNativeQuery("TRUNCATE TABLE accesscontrolentry").executeUpdate();
 
 			em.createNativeQuery("DELETE FROM series_data_in WHERE seriesid != 0").executeUpdate();
 			em.createNativeQuery("DELETE FROM series_data_out WHERE seriesid != 0").executeUpdate();

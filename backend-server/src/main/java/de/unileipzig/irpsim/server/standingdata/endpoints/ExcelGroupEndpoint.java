@@ -1,10 +1,13 @@
 package de.unileipzig.irpsim.server.standingdata.endpoints;
 
+import de.unileipzig.irpsim.core.security.Permission;
+import de.unileipzig.irpsim.core.security.ResourceType;
 import de.unileipzig.irpsim.core.simulation.data.persistence.ClosableEntityManager;
 import de.unileipzig.irpsim.core.simulation.data.persistence.ClosableEntityManagerProxy;
 import de.unileipzig.irpsim.core.standingdata.StaticDataUtil;
 import de.unileipzig.irpsim.core.standingdata.data.Stammdatum;
 import de.unileipzig.irpsim.server.data.Responses;
+import de.unileipzig.irpsim.server.security.ResourceAccess;
 import de.unileipzig.irpsim.server.standingdata.excel.TemplateImporter;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -25,8 +28,10 @@ import javax.persistence.criteria.Root;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -43,7 +48,8 @@ public class ExcelGroupEndpoint {
 			@ApiResponse(code = 400, message = "Invalid ID supplied"),
 			@ApiResponse(code = 404, message = "Not Found") })
 	public final Response putExcel(@FormDataParam("file") final InputStream fileInputStream,
-			@FormDataParam("file") final FormDataContentDisposition contentDispositionHeader) throws EncryptedDocumentException, InvalidFormatException, IOException {
+			@FormDataParam("file") final FormDataContentDisposition contentDispositionHeader, @Context final SecurityContext securityContext)
+			throws EncryptedDocumentException, InvalidFormatException, IOException {
 		final String filename = contentDispositionHeader.getFileName();
 		final Workbook workbook = WorkbookFactory.create(fileInputStream);
 		final Stammdatum realStammdatum;
@@ -53,6 +59,11 @@ public class ExcelGroupEndpoint {
 			realStammdatum = getStammdatum(session, excelStammdatum);
 			if (realStammdatum == null) {
 				return Responses.badRequestResponse("Datei " + filename + " - Stammdatum nicht vorhanden");
+			}
+			// Welches Stammdatum befüllt wird, steht erst in der Datei; daher wird
+			// das Schreibrecht hier und nicht im pfadbasierten Filter geprüft.
+			if (!ResourceAccess.isPermitted(securityContext, ResourceType.STAMMDATUM, realStammdatum.getId(), Permission.WRITE)) {
+				return ResourceAccess.forbidden();
 			}
 
 			return DataUploader.uploadData(workbook, realStammdatum.getId());

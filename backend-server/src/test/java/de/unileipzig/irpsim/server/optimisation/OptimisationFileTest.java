@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import de.unileipzig.irpsim.core.testutils.DatabaseTestUtils;
 import de.unileipzig.irpsim.core.utils.TestFiles;
 import de.unileipzig.irpsim.server.utils.ServerTestUtils;
+import de.unileipzig.irpsim.server.utils.RESTCaller;
 import de.unileipzig.irpsim.server.utils.ServerTests;
 
 /**
@@ -47,7 +48,7 @@ public final class OptimisationFileTest extends ServerTests {
 		Thread.sleep(1000);
 
 		final JerseyWebTarget jwt = getJerseyClient().target(ServerTestUtils.OPTIMISATION_URI + "/" + jobid + "/0/lstfile");
-		final Response response = jwt.request().get();
+		final Response response = RESTCaller.request(jwt).get();
 
 		final String responseString = response.readEntity(String.class);
 

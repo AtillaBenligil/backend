@@ -4,21 +4,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.junit.Before;
 import org.junit.Test;
 
-import de.unileipzig.irpsim.core.security.AccessControlEntry;
-import de.unileipzig.irpsim.core.security.AccessControlRepository;
 import de.unileipzig.irpsim.core.security.AuthorizationService;
 import de.unileipzig.irpsim.core.security.Permission;
 import de.unileipzig.irpsim.core.security.ResourceType;
@@ -36,7 +29,7 @@ public class AuthorizationServiceTest {
 
    private static final Set<String> NO_DIRECTORY_GROUPS = Collections.emptySet();
 
-   private InMemoryRepository repository;
+   private InMemoryAccessControlRepository repository;
    private AuthorizationService service;
 
    /**
@@ -44,7 +37,7 @@ public class AuthorizationServiceTest {
     */
    @Before
    public void setUp() {
-      repository = new InMemoryRepository();
+      repository = new InMemoryAccessControlRepository();
       service = new AuthorizationService(repository);
    }
 
@@ -173,58 +166,92 @@ public class AuthorizationServiceTest {
    }
 
    /**
-    * Eine Rechteablage im Arbeitsspeicher für die Tests.
+    * Administratoren dürfen auch fremde Ressourcen und Ressourcen ohne
+    * Rechteeinträge verändern; sonst ließen sich diese nie löschen.
     */
-   private static final class InMemoryRepository implements AccessControlRepository {
+   @Test
+   public void testAdministratorMayWriteEverything() {
+      final AuthorizationService withAdministrators = new AuthorizationService(repository, "irpsim-admins");
+      withAdministrators.grant(ResourceType.JOB, 1L, SubjectType.USER, "bob", Permission.WRITE);
+      final Set<String> adminGroups = Collections.singleton("irpsim-admins");
 
-      private final List<AccessControlEntry> entries = new ArrayList<>();
-      private final Map<String, Set<String>> memberships = new LinkedHashMap<>();
+      assertTrue(withAdministrators.isAdministrator(adminGroups));
+      assertTrue(withAdministrators.isPermitted("alice", adminGroups, ResourceType.JOB, 1L, Permission.WRITE));
+      assertTrue(withAdministrators.isPermitted("alice", adminGroups, ResourceType.SCENARIO, 99L, Permission.WRITE));
+      assertFalse(withAdministrators.isPermitted("carol", NO_DIRECTORY_GROUPS, ResourceType.JOB, 1L, Permission.WRITE));
+   }
 
-      private void addGroupMembership(final String username, final String group) {
-         memberships.computeIfAbsent(username, key -> new LinkedHashSet<>()).add(group);
+   /**
+    * Eine gleichnamige Anwendungsgruppe darf keine Administratorrechte
+    * verleihen, da sich Benutzer sonst über die Gruppenverwaltung selbst
+    * befördern könnten.
+    */
+   @Test
+   public void testApplicationGroupDoesNotGrantAdministratorRole() {
+      final AuthorizationService withAdministrators = new AuthorizationService(repository, "irpsim-admins");
+      repository.addGroupMembership("mallory", "irpsim-admins");
+
+      assertFalse(withAdministrators.isPermitted("mallory", NO_DIRECTORY_GROUPS, ResourceType.SCENARIO, 99L, Permission.WRITE));
+   }
+
+   /**
+    * Ohne konfigurierte Administratorgruppe gibt es keine Administratoren.
+    */
+   @Test
+   public void testNoAdministratorsWithoutConfiguredGroup() {
+      assertFalse(service.isAdministrator(Collections.singleton("irpsim-admins")));
+      assertFalse(service.isPermitted("alice", Collections.singleton("irpsim-admins"), ResourceType.SCENARIO, 99L, Permission.WRITE));
+   }
+
+   /**
+    * Das erneute Setzen eines Rechts muss den bisherigen Eintrag desselben
+    * Subjekts ersetzen, statt einen zweiten anzulegen.
+    */
+   @Test
+   public void testSetPermissionReplacesEntryOfSameSubject() {
+      service.grant(ResourceType.SCENARIO, 1L, SubjectType.USER, "bob", Permission.WRITE);
+      service.setPermission(ResourceType.SCENARIO, 1L, SubjectType.GROUP, "irpsim-viewers", Permission.READ);
+      service.setPermission(ResourceType.SCENARIO, 1L, SubjectType.GROUP, "irpsim-viewers", Permission.WRITE);
+
+      assertEquals(2, service.findEntries(ResourceType.SCENARIO, 1L).size());
+      assertTrue(service.isPermitted("carol", Collections.singleton("irpsim-viewers"), ResourceType.SCENARIO, 1L, Permission.WRITE));
+   }
+
+   /**
+    * Ein entzogenes Recht darf nicht mehr gelten.
+    */
+   @Test
+   public void testRevokedPermissionNoLongerApplies() {
+      service.grant(ResourceType.SCENARIO, 1L, SubjectType.USER, "bob", Permission.WRITE);
+      service.setPermission(ResourceType.SCENARIO, 1L, SubjectType.USER, "carol", Permission.READ);
+
+      assertTrue(service.revoke(ResourceType.SCENARIO, 1L, SubjectType.USER, "carol"));
+      assertFalse(service.isPermitted("carol", NO_DIRECTORY_GROUPS, ResourceType.SCENARIO, 1L, Permission.READ));
+   }
+
+   /**
+    * Das letzte Schreibrecht darf weder entzogen noch herabgestuft werden.
+    * Ohne Einträge wäre die Ressource sonst wie eine Altressource für alle
+    * lesbar.
+    */
+   @Test
+   public void testLastWriterCannotBeRemoved() {
+      service.grant(ResourceType.SCENARIO, 1L, SubjectType.USER, "bob", Permission.WRITE);
+
+      try {
+         service.revoke(ResourceType.SCENARIO, 1L, SubjectType.USER, "bob");
+         org.junit.Assert.fail("Das letzte Schreibrecht darf nicht entzogen werden");
+      } catch (final IllegalStateException e) {
+         assertTrue(service.isPermitted("bob", NO_DIRECTORY_GROUPS, ResourceType.SCENARIO, 1L, Permission.WRITE));
+      }
+      try {
+         service.setPermission(ResourceType.SCENARIO, 1L, SubjectType.USER, "bob", Permission.READ);
+         org.junit.Assert.fail("Das letzte Schreibrecht darf nicht herabgestuft werden");
+      } catch (final IllegalStateException e) {
+         assertFalse(service.isPermitted("carol", NO_DIRECTORY_GROUPS, ResourceType.SCENARIO, 1L, Permission.READ));
       }
 
-      @Override
-      public List<AccessControlEntry> findEntries(final ResourceType resourceType, final long resourceId) {
-         return entries.stream()
-               .filter(entry -> entry.getResourceType() == resourceType && entry.getResourceId() == resourceId)
-               .collect(Collectors.toList());
-      }
-
-      @Override
-      public Set<Long> findRestrictedResources(final ResourceType resourceType) {
-         return entries.stream()
-               .filter(entry -> entry.getResourceType() == resourceType)
-               .map(AccessControlEntry::getResourceId)
-               .collect(Collectors.toCollection(LinkedHashSet::new));
-      }
-
-      @Override
-      public Set<Long> findPermittedResources(final ResourceType resourceType, final String username, final Set<String> groups,
-            final Permission required) {
-         return entries.stream()
-               .filter(entry -> entry.getResourceType() == resourceType)
-               .filter(entry -> entry.getPermission().includes(required))
-               .filter(entry -> entry.getSubjectType() == SubjectType.USER
-                     ? entry.getSubjectName().equals(username)
-                     : groups.contains(entry.getSubjectName()))
-               .map(AccessControlEntry::getResourceId)
-               .collect(Collectors.toCollection(LinkedHashSet::new));
-      }
-
-      @Override
-      public Set<String> findGroupNames(final String username) {
-         return memberships.getOrDefault(username, Collections.emptySet());
-      }
-
-      @Override
-      public void save(final AccessControlEntry entry) {
-         entries.add(entry);
-      }
-
-      @Override
-      public void deleteEntries(final ResourceType resourceType, final long resourceId) {
-         entries.removeIf(entry -> entry.getResourceType() == resourceType && entry.getResourceId() == resourceId);
-      }
+      service.setPermission(ResourceType.SCENARIO, 1L, SubjectType.GROUP, "irpsim-modellers", Permission.WRITE);
+      assertTrue(service.revoke(ResourceType.SCENARIO, 1L, SubjectType.USER, "bob"));
    }
 }

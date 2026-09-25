@@ -9,6 +9,7 @@ import de.unileipzig.irpsim.server.utils.ServerTestUtils;
 import de.unileipzig.irpsim.server.utils.ServerTests;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.math3.util.Pair;
+import org.json.JSONObject;
 import org.junit.Test;
 
 import javax.ws.rs.core.Response;
@@ -39,6 +40,24 @@ public class ModelDefinitionsEndpointTest extends ServerTests {
       assertTrue(isDict);
       int numberOfFiles = dict.list().length;
       assertEquals(numberOfFiles, countIds);
+   }
+
+   /*
+    * Die Stammdatenmaske laedt die Definitionen aller Modelle auf einmal. Kombinierte Modelle wie opt-act haben keine
+    * eigene Definitionsdatei und duerfen die Antwort nicht verhindern.
+    */
+   @Test
+   public void getAllModelDefinitionsSkipsModelsWithoutDefinitionFile() {
+      Response response = RESTCaller.callGetResponse(ServerTestUtils.URI + "modeldefinitions?all=true");
+
+      assertEquals(200, response.getStatus());
+
+      JSONObject all = new JSONObject(response.readEntity(String.class));
+      for (String id : all.keySet()) {
+         assertNotNull("Definitionsdatei für Modell " + id, ModelDefinitionsEndpoint.class.getResource("/modeldefinitions/" + id + ".json"));
+         assertTrue(all.getJSONObject(id).getJSONObject("data").has("definitions"));
+      }
+      assertTrue(all.has("1"));
    }
 
    @Test

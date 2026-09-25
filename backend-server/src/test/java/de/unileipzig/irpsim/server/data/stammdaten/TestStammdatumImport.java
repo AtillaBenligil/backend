@@ -218,7 +218,7 @@ public class TestStammdatumImport extends ServerTests {
 	public void testSendEmpty() throws IOException {
 		final JerseyClient jc = new JerseyClientBuilder().register(MultiPartFeature.class).build();
 		final JerseyWebTarget target = jc.target(ServerTestUtils.URI + "stammdaten/" + id.get(0) + "/excel");
-		final Response response = target.request().get();
+		final Response response = RESTCaller.request(target).get();
 
 		final InputStream input = (InputStream) response.getEntity();
 
@@ -240,7 +240,7 @@ public class TestStammdatumImport extends ServerTests {
 	public void testMissingData() throws IOException {
 		final JerseyClient jc = new JerseyClientBuilder().register(MultiPartFeature.class).build();
 		final JerseyWebTarget target = jc.target(ServerTestUtils.URI + "stammdaten/" + id_missingdata + "/excel");
-		final Response response = target.request().get();
+		final Response response = RESTCaller.request(target).get();
 
 		Assert.assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
 	}
@@ -254,7 +254,7 @@ public class TestStammdatumImport extends ServerTests {
 			multiPart.bodyPart(new FileDataBodyPart("file", inFile, MediaType.APPLICATION_OCTET_STREAM_TYPE));
 		}
 
-		final Response clientResp = target.request(MediaType.MULTIPART_FORM_DATA_TYPE).put(Entity.entity(multiPart, MediaType.MULTIPART_FORM_DATA));
+		final Response clientResp = RESTCaller.request(target, MediaType.MULTIPART_FORM_DATA_TYPE).put(Entity.entity(multiPart, MediaType.MULTIPART_FORM_DATA));
 		return clientResp;
 	}
 

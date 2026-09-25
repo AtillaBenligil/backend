@@ -153,6 +153,11 @@ public class ModelDefinitionsEndpoint {
       if (all) {
          JSONObject data = new JSONObject();
          for (ModelInformation modelMetadata : information.getModelInformations()) {
+            // Kombinierte Modelle wie opt-act bestehen aus den Definitionen ihrer Teilmodelle und haben keine eigene Datei.
+            if (ScenarioEndpoint.class.getResource("/modeldefinitions/" + modelMetadata.getId() + ".json") == null) {
+               LOG.warn("Keine Modelldefinition für Modell {} ({}) vorhanden, wird übersprungen", modelMetadata.getId(), modelMetadata.getName());
+               continue;
+            }
             final String modelData = readModeldefinition(modelMetadata.getId());
             JSONObject jsonObject = new JSONObject();
             String metadataJSON = Constants.MAPPER.writeValueAsString(modelMetadata); // inefficient, but works

@@ -227,7 +227,7 @@ public class TemplateImporter {
 		final InputStream is = new FileInputStream(inFile);
 		final OPCPackage pkg = OPCPackage.open(is);
 		final XSSFWorkbook wb = new XSSFWorkbook(pkg);
-		final Stammdatum sd = new Stammdatum("Stromlast", "par_A_B_C", "muster@mann.com", "muster@mann.com", TimeInterval.MONTH, 2015, 1, new String[] { "LEME A", "LEME B" });
+		final Stammdatum sd = new Stammdatum("Stromlast", "par_A_B_C", TimeInterval.MONTH, 2015, 1, new String[] { "LEME A", "LEME B" });
 
 		final SzenarioSet sse = new SzenarioSet();
 

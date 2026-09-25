@@ -39,14 +39,21 @@ public enum StammdatumEntity {
 			((s1, s2) -> {
 				return s1.isStandardszenario() == s2.isStandardszenario();
 			})),
-	VERANTWORTLICHER_BEZUGSJAHR(7, "Email Verantwortlicher Bezugsjahr",
-			(s -> s.getVerantwortlicherBezugsjahr().getEmail()),
-			((s, value) -> s.getVerantwortlicherBezugsjahr().setEmail(value)),
-			((s1, s2) -> s1.getVerantwortlicherBezugsjahr().getEmail().equals(s2.getVerantwortlicherBezugsjahr().getEmail()))),
-	VERANTWORTLICHER_PRONOGEJAHR(8, "Email Verantwortlicher Prognosejahr",
-			(s -> s.getVerantwortlicherPrognosejahr().getEmail()),
-			((s, value) -> s.getVerantwortlicherPrognosejahr().setEmail(value)),
-			((s1, s2) -> s1.getVerantwortlicherPrognosejahr().getEmail().equals(s2.getVerantwortlicherPrognosejahr().getEmail())));
+	/*
+	 * Die verantwortlichen Personen wurden durch die Rechteverwaltung ersetzt.
+	 * Die beiden Zeilen bleiben erhalten, weil die Excel-Vorlagen über die
+	 * Zeilennummer gelesen werden und bestehende Dateien sonst nicht mehr
+	 * passen; ihr Inhalt wird beim Import ignoriert und beim Export leer
+	 * gelassen.
+	 */
+	VERANTWORTLICHER_BEZUGSJAHR(7, "Email Verantwortlicher Bezugsjahr (nicht mehr verwendet)",
+			(s -> ""),
+			((s, value) -> { }),
+			((s1, s2) -> true)),
+	VERANTWORTLICHER_PRONOGEJAHR(8, "Email Verantwortlicher Prognosejahr (nicht mehr verwendet)",
+			(s -> ""),
+			((s, value) -> { }),
+			((s1, s2) -> true));
 
 	public int getIndex() {
 		return index;

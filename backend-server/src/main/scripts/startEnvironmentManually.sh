@@ -21,3 +21,7 @@ export IRPSIM_PORT=8282
 export IRPSIM_PERSISTENCEFOLDER=irpsim_persistence
 export IRPSIM_MYSQL_JAVAPATH=$(pwd)/../import
 
+# LDAP-Verzeichnis aus docker-compose.yml (docker compose up -d ldap)
+export IRPSIM_LDAP_URL=ldap://localhost:10389
+export IRPSIM_LDAP_BIND_DN=cn=readonly,dc=irpsim,dc=uni-leipzig,dc=de
+export IRPSIM_LDAP_BIND_PASSWORD=r3ad0nly

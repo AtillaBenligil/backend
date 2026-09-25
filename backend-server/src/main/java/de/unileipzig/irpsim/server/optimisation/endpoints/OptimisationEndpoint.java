@@ -9,19 +9,24 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.json.JSONArray;
 
 import de.unileipzig.irpsim.core.Constants;
+import de.unileipzig.irpsim.core.security.Permission;
+import de.unileipzig.irpsim.core.security.ResourceType;
 import de.unileipzig.irpsim.core.simulation.data.json.JSONParameters;
 import de.unileipzig.irpsim.core.simulation.data.json.JSONParametersMultimodel;
 import de.unileipzig.irpsim.core.simulation.data.json.YearData;
 import de.unileipzig.irpsim.server.data.Responses;
 import de.unileipzig.irpsim.server.optimisation.queue.OptimisationJobHandler;
+import de.unileipzig.irpsim.server.security.ResourceAccess;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
@@ -50,7 +55,7 @@ public class OptimisationEndpoint { // TODO Umbenennen JobstartEndpoint
    @Consumes(MediaType.APPLICATION_JSON)
    @ApiOperation(value = "Startet die Simulation", notes = "Startet eine Simulation durch den Aufruf der GAMS-API. ")
    @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok"), @ApiResponse(code = 400, message = "Bad Request") })
-   public final Response startSimulation(final String optimisationScenario) {
+   public final Response startSimulation(final String optimisationScenario, @Context final SecurityContext securityContext) {
       LOG.debug("Starte Simulation: " + optimisationScenario.substring(0, 500));
       try {
          final JSONParametersMultimodel gamsparameters = Constants.MAPPER.readValue(optimisationScenario, JSONParametersMultimodel.class);
@@ -59,6 +64,10 @@ public class OptimisationEndpoint { // TODO Umbenennen JobstartEndpoint
             return Responses.badRequestResponse("Deklarierte Namen sind nicht zulässig: " + wrongSets + ". Namen dürfen maximal 61 Zeichen lang sein.");
          }
          long jobid = OptimisationJobHandler.getInstance().newJob(gamsparameters);
+         // Ohne diesen Eintrag waere der Auftrag fuer alle lesbar, aber fuer
+         // niemanden ausser den Administratoren abbrechbar oder loeschbar. Bis
+         // der Eintrag gespeichert ist, ist der Auftrag hoechstens lesbar.
+         ResourceAccess.grantOwnership(securityContext, ResourceType.JOB, jobid);
 
          return Response.status(Response.Status.OK).entity("[" + jobid + "]").build();
       } catch (final Exception e) {
@@ -102,16 +111,21 @@ public class OptimisationEndpoint { // TODO Umbenennen JobstartEndpoint
    @ApiOperation(value = "Gibt alle Simulationsjobs zurück.", notes = "Gibt die zuvor gespeicherte Liste aller Simulationsläufe zurück. Es werden auch beendete Simulationsläufe ausgegeben.")
    @ApiResponses(value = { @ApiResponse(code = 200, message = "Ok") })
    @Deprecated // wird scheinbar nicht mehr genutzt
-   public final Response getSimulationList(@DefaultValue("false") @QueryParam("running") final boolean running) {
+   public final Response getSimulationList(@DefaultValue("false") @QueryParam("running") final boolean running,
+         @Context final SecurityContext securityContext) {
       try {
          if (running) {
             final JSONArray jsa = new JSONArray();
-            OptimisationJobHandler.getInstance().getRunningJobs().stream().forEach(job -> jsa.put(job.getId()));
+            OptimisationJobHandler.getInstance().getRunningJobs().stream()
+                  .filter(job -> ResourceAccess.isPermitted(securityContext, ResourceType.JOB, job.getId(), Permission.READ))
+                  .forEach(job -> jsa.put(job.getId()));
             LOG.info("Laufende Optimierungen, IDs: {}", jsa);
             return Response.status(Response.Status.OK).entity(jsa.toString()).build();
          } else {
             final JSONArray jsa = new JSONArray();
-            OptimisationJobHandler.getInstance().getPersistedJobs().stream().forEachOrdered(job -> jsa.put(job.getId()));
+            OptimisationJobHandler.getInstance().getPersistedJobs().stream()
+                  .filter(job -> ResourceAccess.isPermitted(securityContext, ResourceType.JOB, job.getId(), Permission.READ))
+                  .forEachOrdered(job -> jsa.put(job.getId()));
             LOG.info("Gespeicherte Optimierungen, IDs: {}", jsa);
             return Response.status(Response.Status.OK).entity(jsa.toString()).build();
          }
