@@ -1,3 +1,25 @@
+> ## My contribution: LDAP authentication and access control (2026)
+>
+> This fork of the [IRPsim backend](https://github.com/IRPsim/backend) (an energy-system
+> modelling platform from Leipzig University) adds security to a Java/JAX-RS backend
+> that had none. University project, built over three sprints.
+>
+> - **LDAP login** (`server/security`): login, logout and password change endpoints; a
+>   JNDI-based LDAP authenticator; session tokens with a request filter. Groups and email
+>   addresses are read from OpenLDAP through a service account.
+> - **Role-based access control:** an administrator role, groups, and per-resource
+>   grants for scenarios and simulation jobs, enforced by a JAX-RS authorization
+>   filter and in the service layer.
+> - **Standing data ACLs:** the old "responsible person" ownership was replaced with
+>   read/write grants, plus a migration that converts existing records without data loss.
+> - **Build and tests:** an OpenLDAP server (Docker Compose, LDIF seed data) is part of
+>   the build automation; unit and integration tests cover login, authorization
+>   decisions and the migration.
+>
+> 14 commits, about 5,700 lines added including tests. Frontend counterpart:
+> [ui-client fork](https://github.com/AtillaBenligil/ui-client).
+> Commit messages are in German, the project's working language.
+
 # IRPsim backend
 
 This repository provides the backend for the IRPsim infrastructure, which enables input and output data management for models in the energy domain, model execution management and model coupling.
